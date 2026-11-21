@@ -81,7 +81,7 @@ Loader kinds:
 
 | Engine | `kind` values |
 | --- | --- |
-| `sherpa-onnx` (speech-to-text) | `whisper`, `moonshine`, `moonshine_v2`, `transducer`, `nemo_transducer`, `nemo_ctc`, `zipformer_ctc`, `sense_voice`, `paraformer`, `dolphin_ctc`, `omnilingual_ctc`, `telespeech_ctc`, `wenet_ctc`, `canary`; streaming: `online_transducer`, `online_nemo_ctc`, `online_zipformer2_ctc`, `online_paraformer`, `online_t_one_ctc` |
+| `sherpa-onnx` (speech-to-text) | `whisper`, `moonshine`, `moonshine_v2`, `transducer`, `nemo_transducer`, `nemo_ctc`, `zipformer_ctc`, `sense_voice`, `paraformer`, `dolphin_ctc`, `omnilingual_ctc`, `telespeech_ctc`, `wenet_ctc`, `canary`, `qwen3_asr`, `cohere_transcribe`; streaming: `online_transducer`, `online_nemo_ctc`, `online_zipformer2_ctc`, `online_paraformer`, `online_t_one_ctc` |
 | `sherpa-onnx` (text-to-speech) | `vits` (Piper format, MMS, Coqui, MeloTTS), `kokoro`, `kitten`, `matcha` |
 | `sherpa-onnx` (VAD) | `silero_vad`, `ten_vad` |
 | `faster-whisper` | `ct2-whisper` |

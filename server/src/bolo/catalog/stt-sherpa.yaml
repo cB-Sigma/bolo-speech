@@ -3905,3 +3905,94 @@
   options:
     stream_language: true
     lowercase: false
+- id: rumble-2-flash
+  aliases:
+  - Reson8/Rumble-2-Flash
+  - TypeWhisper/Rumble-2-Flash-sherpa-onnx-int8
+  task: stt
+  engine: sherpa-onnx
+  kind: qwen3_asr
+  family: Rumble
+  languages:
+  - af
+  - ar
+  - bn
+  - bs
+  - ca
+  - ceb
+  - cs
+  - da
+  - de
+  - el
+  - en
+  - es
+  - eu
+  - fa
+  - fi
+  - tl
+  - fr
+  - hi
+  - hr
+  - hu
+  - id
+  - is
+  - it
+  - ja
+  - ko
+  - lt
+  - lv
+  - mk
+  - ms
+  - mt
+  - 'no'
+  - nl
+  - pl
+  - pt
+  - ro
+  - ru
+  - sq
+  - sr
+  - sv
+  - th
+  - tr
+  - uk
+  - vi
+  - yue
+  - zh
+  tier: accuracy
+  size_bytes: 656210571
+  params: 500000000
+  license: Apache-2.0
+  features:
+  - punctuation
+  - language-detect
+  description: 'Reson8 Rumble-2-Flash (0.5 B parameters, built on Qwen3-ASR 0.6B with a 14-layer text decoder):
+    multilingual recognition in 45 languages with punctuation; it detects the language when none is given. Int8 ONNX
+    export in sherpa-onnx''s Qwen3-ASR layout by TypeWhisper (not by Reson8). No word timestamps; audio is decoded in
+    pieces of up to 20 s.'
+  source_url: https://huggingface.co/Reson8/Rumble-2-Flash
+  validated: cpu
+  measured:
+    rtf: 0.463
+    wer: 0.0
+    audio_s: 23.0
+    load_s: 2.51
+    memory_mb: 755
+    threads: 4
+    engine: sherpa-onnx 2.0.2
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-21'
+    test_audio: bolo's en-long sample (English, Kokoro, 11.8 s); es1.wav and fr1.wav of csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25
+      test_wavs
+    note: 'Through bolo (core.transcribe), English and French with language=, Spanish without: all three word for
+      word (the Spanish one reported as es). The machine was shared (load average 4-5); sherpa-onnx alone on the same
+      clips took RTF 0.14-0.19.'
+  source:
+    repo: TypeWhisper/Rumble-2-Flash-sherpa-onnx-int8
+    revision: a8128305e8e8c4aa5bf6fcd0a8454347ff80d6d1
+    include:
+    - conv_frontend.onnx
+    - encoder.int8.onnx
+    - decoder.int8.onnx
+    - tokenizer/*
+    - LICENSE

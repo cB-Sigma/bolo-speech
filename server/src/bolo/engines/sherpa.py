@@ -76,6 +76,8 @@ OFFLINE_KINDS = (
     "telespeech_ctc",
     "wenet_ctc",
     "canary",
+    "qwen3_asr",
+    "cohere_transcribe",
 )
 ONLINE_KINDS = (
     "online_transducer",
@@ -199,6 +201,42 @@ def _log_probs(res: Any, n: int) -> list[float] | None:
 
 
 _SENSE_VOICE_LANGS = {"<|zh|>": "zh", "<|en|>": "en", "<|ja|>": "ja", "<|ko|>": "ko", "<|yue|>": "yue"}
+
+#: Qwen3-ASR (and models built on it, such as Rumble-2-Flash) take and report the language by its English name;
+#: these are the names that differ from bolo.text.iso639.name
+_QWEN3_ASR_NAMES = {"tl": "Filipino", "zh": "Chinese", "yue": "Cantonese", "no": "Norwegian", "sl": "Slovenian"}
+#: what the model writes first when no language was given: "language English<asr_text>..." (sherpa-onnx 2.0 turns
+#: the tag into ". "); "language None" for audio without speech
+_QWEN3_ASR_PREFIX = re.compile(r"^\s*language\s+([A-Za-z]+)(?:\s*<asr_text>|\s*[.:,]\s*|\s*$)")
+
+
+def qwen3_asr_language_name(code: str) -> str:
+    """The English name Qwen3-ASR takes for a language code (``de`` -> ``German``, ``tl`` -> ``Filipino``)."""
+    from bolo.text import iso639
+
+    c = iso639.normalize(code)
+    return _QWEN3_ASR_NAMES.get(c) or iso639.name(c)
+
+
+def qwen3_asr_split(text: str) -> tuple[str | None, str]:
+    """Qwen3-ASR's output without its language prefix: ``(language code or None, transcript)``.
+    ``"language German. Guten Morgen."`` -> ``("de", "Guten Morgen.")``; ``"language None"`` -> ``(None, "")``."""
+    m = _QWEN3_ASR_PREFIX.match(text)
+    if not m:
+        return None, text.replace("<asr_text>", "").strip()
+    name, rest = m.group(1), text[m.end() :].strip()
+    if name.lower() == "none":
+        return None, rest
+    from bolo.text import iso639
+
+    wanted = name.lower()
+    for code, label in _QWEN3_ASR_NAMES.items():
+        if label.lower() == wanted:
+            return code, rest
+    for code, label in iso639.NAMES_1.items():
+        if label.lower() == wanted:
+            return code, rest
+    return None, rest
 
 
 def line_is_blank_only(symbols: set[str]) -> bool:
@@ -448,7 +486,10 @@ class SherpaOfflineSTT(STTModel):
         self.threads = opts.threads
         self.provider = sherpa_provider(opts.device)
         self.max_batch = int(spec.get("max_batch", 8))
-        self.max_chunk_s = float(spec.get("max_chunk_s", 30.0 if kind in ("whisper", "canary") else 60.0))
+        # Qwen3-ASR exports hold at most max_total_len (512) tokens: about 13 per second of audio, the prompt and the
+        # transcript, so 20 s pieces leave room for the text
+        default_chunk = {"whisper": 30.0, "canary": 30.0, "qwen3_asr": 20.0, "cohere_transcribe": 30.0}.get(kind, 60.0)
+        self.max_chunk_s = float(spec.get("max_chunk_s", default_chunk))
         self.supports_translate = (kind == "whisper" and not spec.get("english_only", False)) or kind == "canary"
         if kind == "canary":
             # Canary translates from English into each of its languages and from each of them into English
@@ -459,7 +500,7 @@ class SherpaOfflineSTT(STTModel):
         # option `token_timestamps: true`. Moonshine has no token times in this runtime.
         self.token_timestamps = kind == "whisper" and bool(spec.get("token_timestamps", False))
         self.supports_word_timestamps = self.token_timestamps or kind not in (
-            "whisper", "moonshine", "moonshine_v2", "canary", "paraformer",
+            "whisper", "moonshine", "moonshine_v2", "canary", "paraformer", "qwen3_asr", "cohere_transcribe",
         )  # fmt: skip
         self.default_language = str(spec.get("language", ""))
         self._case = "mixed"
@@ -541,6 +582,27 @@ class SherpaOfflineSTT(STTModel):
                 tgt_lang=task.partition(":")[2] if task.startswith("translate:") else language or "en",
                 **common,
             )
+        if k == "qwen3_asr":
+            return so.OfflineRecognizer.from_qwen3_asr(
+                conv_frontend=find_file(p, "conv_frontend*.onnx"),
+                encoder=find_file(p, "encoder*.onnx"),
+                decoder=find_file(p, "decoder*.onnx"),
+                tokenizer=find_dir(p, "tokenizer") or str(p),
+                max_total_len=int(self.spec.get("max_total_len", 512)),
+                max_new_tokens=int(self.spec.get("max_new_tokens", 200)),
+                **common,
+            )
+        if k == "cohere_transcribe":
+            # the model does not detect the language: each stream is told it (see transcribe), English by default
+            return so.OfflineRecognizer.from_cohere_transcribe(
+                encoder=find_file(p, "encoder*.onnx"),
+                decoder=find_file(p, "decoder*.onnx"),
+                tokens=find_file(p, "tokens.txt"),
+                language=self.default_language or "en",
+                use_punct=bool(self.spec.get("punctuation", True)),
+                use_itn=bool(self.spec.get("itn", True)),
+                **common,
+            )
         model = find_file(p, "model*.onnx")
         tokens = find_file(p, "tokens.txt")
         if k == "nemo_ctc":
@@ -619,6 +681,10 @@ class SherpaOfflineSTT(STTModel):
             streams = []
             for i in idxs:
                 s = rec.create_stream(hotwords_for(requests[i].hotwords, self._case)) if hot else rec.create_stream()
+                if self.kind == "qwen3_asr" and lang:
+                    s.set_option("language", qwen3_asr_language_name(lang))  # else the model detects it
+                elif self.kind == "cohere_transcribe":
+                    s.set_option("language", lang or self.default_language or "en")
                 s.accept_waveform(self.sample_rate, requests[i].samples)
                 streams.append(s)
             rec.decode_streams(streams)
@@ -692,6 +758,11 @@ class SherpaOfflineSTT(STTModel):
         text = str(res.text).strip()
         duration = len(req.samples) / self.sample_rate
         detected = lang or None
+        if self.kind == "qwen3_asr":
+            found, text = qwen3_asr_split(text)
+            detected = detected or found
+        elif self.kind == "cohere_transcribe":
+            detected = lang or self.default_language or "en"
         raw_lang = str(getattr(res, "lang", "") or "")
         if raw_lang:
             detected = _SENSE_VOICE_LANGS.get(raw_lang, raw_lang.strip("<|>")) or detected

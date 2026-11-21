@@ -33,6 +33,8 @@ KINDS: dict[str, tuple[str, str, bool]] = {
     "paraformer": ("sherpa-onnx", "stt", False),
     "dolphin_ctc": ("sherpa-onnx", "stt", False),
     "omnilingual_ctc": ("sherpa-onnx", "stt", False),
+    "qwen3_asr": ("sherpa-onnx", "stt", False),
+    "cohere_transcribe": ("sherpa-onnx", "stt", False),
     "online_transducer": ("sherpa-onnx", "stt", True),
     "online_nemo_ctc": ("sherpa-onnx", "stt", True),
     "online_zipformer2_ctc": ("sherpa-onnx", "stt", True),
@@ -85,8 +87,12 @@ def detect_kind(repo: str, paths: list[str]) -> str | None:
         return "moonshine"
     if has(r"^encoder_model\.(ort|onnx)$") and has(r"^decoder_model_merged"):
         return "moonshine_v2"
+    if has(r"^conv_frontend.*\.onnx$") and has(r"^encoder.*\.onnx$") and has(r"^decoder.*\.onnx$"):
+        return "qwen3_asr"  # Qwen3-ASR and models built on it (sherpa-onnx's from_qwen3_asr layout)
     if "tokens.txt" not in names:
         return None
+    if "cohere" in name and has(r"^encoder.*\.onnx$") and has(r"^decoder.*\.onnx$") and not has(r"^joiner"):
+        return "cohere_transcribe"
     if has(r"^encoder.*\.onnx$") and has(r"^decoder.*\.onnx$") and has(r"^joiner.*\.onnx$"):
         if "streaming" in name:
             return "online_transducer"

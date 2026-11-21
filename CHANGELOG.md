@@ -8,6 +8,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Rumble-2-Flash** (`rumble-2-flash`): Reson8's 0.5 B recogniser built on Qwen3-ASR, 45 languages with punctuation,
+  Apache-2.0. It detects the language when none is given and says which. Runs in sherpa-onnx (an int8 export by
+  TypeWhisper, 656 MB); on the 4-vCPU reference machine it transcribed English, Spanish and French test clips word for
+  word at 0.46 of real time while the machine was busy (0.14-0.19 with sherpa-onnx alone).
+- **sherpa-onnx's Qwen3-ASR and Cohere Transcribe recognisers** (model kinds `qwen3_asr` and `cohere_transcribe`):
+  `language` is passed to the model per request (Qwen3-ASR by its English name, as the model takes it), Qwen3-ASR's
+  "language X" prefix is taken off the transcript and reported as the detected language, and `bolo pull hf:<repo>`
+  recognises both layouts.
+
 - **Gradium Phonon 40M on audio.cpp**: the multilingual checkpoint (`gradium-phonon-40m-multilingual-audiocpp`,
   English, French, German, Spanish and Portuguese in one set of weights) and the English, French, German, Spanish
   and Portuguese ones (`gradium-phonon-40m-<lang>-audiocpp`), about 122 MB each, with the checkpoint's default voice.
