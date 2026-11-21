@@ -45,3 +45,50 @@
   options:
     diarization_model: nemotron-3-diarization
     conditioning: turns
+- id: canary-qwen-2.5b-onnx
+  aliases:
+  - nvidia/canary-qwen-2.5b
+  - OpenVoiceOS/canary-qwen-2.5b-onnx
+  task: stt
+  engine: onnxruntime
+  kind: canary_qwen_onnx
+  family: Canary-Qwen
+  languages:
+  - en
+  tier: accuracy
+  size_bytes: 2896879730
+  params: 2500000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/nvidia/canary-qwen-2.5b
+  features:
+  - punctuation
+  description: 'NVIDIA Canary-Qwen 2.5B without NeMo or PyTorch: a FastConformer encoder feeding Qwen3-1.7B, which
+    writes the transcript (English only, with punctuation and capitals; at the top of the Open ASR Leaderboard for
+    English when it was released). Int8 ONNX export by OpenVoiceOS (not by NVIDIA), run by bolo in ONNX Runtime with
+    greedy decoding. No word timestamps; audio is decoded in pieces of up to 30 s. Slow on a CPU (2.9 GB). CC-BY-4.0:
+    credit NVIDIA.'
+  source_url: https://huggingface.co/nvidia/canary-qwen-2.5b
+  validated: cpu
+  measured:
+    rtf: 3.194
+    wer: 0.0
+    audio_s: 11.8
+    load_s: 21.65
+    memory_mb: 4908
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-21'
+    test_audio: bolo's en-long sample (English, Kokoro, 11.8 s)
+    note: 'Through bolo (core.transcribe): word for word, punctuation and capitals included. Slower than real time
+      on this CPU (greedy decoding, one decoder run per token, 4.9 GB of memory); the machine was shared and running
+      a test suite at the same time (load average 5-7).'
+  source:
+    repo: OpenVoiceOS/canary-qwen-2.5b-onnx
+    revision: f3cbcb0c971147ecc81ad6450be9a334bf58ca34
+    include:
+    - encoder_int8.onnx
+    - embed_tokens_int8.onnx
+    - decoder_int8.onnx
+    - config.json
+    - vocab.json

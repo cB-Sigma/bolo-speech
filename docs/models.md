@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-528 models: 232 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+529 models: 233 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -252,6 +252,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `voxtral-mini-3b-llamacpp` (Voxtral) | en, es, fr, pt, hi, de +2 | accuracy | pseudo | 3.2 GB | Apache-2.0 · runs on llama-server · GPU recommended | **CPU** · RTF 1.980 · WER 2.8% |
 | `voxtral-small-24b-llamacpp` (Voxtral) | en, es, fr, pt, hi, de +2 | accuracy | pseudo | 15.7 GB | Apache-2.0 · runs on llama-server · GPU required | untested |
+
+#### Canary-Qwen
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `canary-qwen-2.5b-onnx` | en | accuracy | pseudo | 2.9 GB | CC-BY-4.0 | **CPU** · RTF 3.194 · WER 0.0% |
 
 #### Moonshine
 

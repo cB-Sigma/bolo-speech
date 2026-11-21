@@ -127,7 +127,8 @@ class OnnxRuntimeEngine(Engine):
     license = "MIT"
     url = "https://onnxruntime.ai"
     kinds = (
-        "smart_turn", "text_turn", "nemotron_diarization", "dicow_onnx", "lfm3_audio_onnx", "marblenet_vad",
+        "smart_turn", "text_turn", "nemotron_diarization", "dicow_onnx", "canary_qwen_onnx", "lfm3_audio_onnx",
+        "marblenet_vad",
         "deepfilternet3_stream",
         "whisper_lid", "onnx_lid", "onnx_speaker_embedding", "fbank_speaker_embedding", "onnx_emotion",
         "ctc_align",
@@ -143,7 +144,7 @@ class OnnxRuntimeEngine(Engine):
         except Exception as exc:
             return EngineStatus(
                 self.id, False, None,
-                f"{type(exc).__name__}: {exc}. Optional (end-of-turn detection, MarbleNet VAD, Nemotron diarization, DiCoW, LFM3-Audio, "
+                f"{type(exc).__name__}: {exc}. Optional (end-of-turn detection, MarbleNet VAD, Nemotron diarization, DiCoW, Canary-Qwen, LFM3-Audio, "
                 "DeepFilterNet 3, language identification, speech emotion, forced alignment, DTLN-aec, openWakeWord, "
                 "watermarking): "
                 "pip install onnxruntime",
@@ -170,6 +171,10 @@ class OnnxRuntimeEngine(Engine):
             from bolo.engines.dicow_onnx import DiCoWOnnx
 
             return DiCoWOnnx.from_dir(path, spec, opts)
+        if kind == "canary_qwen_onnx":
+            from bolo.engines.canary_qwen_onnx import CanaryQwenOnnx
+
+            return CanaryQwenOnnx(path, spec, opts)
         if kind == "lfm3_audio_onnx":
             from bolo.s2s_onnx import Lfm3Tts
 

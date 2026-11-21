@@ -8,6 +8,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Canary-Qwen 2.5B without NeMo or PyTorch** (`canary-qwen-2.5b-onnx`): NVIDIA's English recogniser (a
+  FastConformer encoder feeding Qwen3-1.7B, CC-BY-4.0), run by bolo in ONNX Runtime from OpenVoiceOS's int8 export
+  (2.9 GB): the prompt around the audio embeddings, a key/value cache and greedy decoding, written for it (kind
+  `canary_qwen_onnx`). On the 4-vCPU reference machine it transcribed an English clip word for word, slower than
+  real time (3.2 while the machine was busy) with 4.9 GB of memory.
+
 - **Whistle** (`whistle`) and a `cactus` engine: Cactus Compute's 16.9 MB on-device recogniser (Apache-2.0) for
   English, German, French, Spanish, Italian, Dutch and Polish, with language detection, word times with probabilities
   and keyword biasing through a request's `hotwords`. Its 2- and 4-bit weights run only in Cactus's own engine, which

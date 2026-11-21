@@ -51,6 +51,7 @@ KINDS: dict[str, tuple[str, str, bool]] = {
     "ten_vad": ("sherpa-onnx", "vad", False),
     "nemotron_diarization": ("onnxruntime", "diarization", False),
     "dicow_onnx": ("onnxruntime", "stt", False),
+    "canary_qwen_onnx": ("onnxruntime", "stt", False),
 }
 
 #: what a model of these kinds is, whatever directory or repository it comes from: features, default options and
