@@ -66,11 +66,40 @@ def remote_code_problem(core: Bolo, spec: ModelSpec, path: Path | None = None) -
     return None
 
 
+#: catalog ``options.dialect`` of cloud full-duplex models (engine remote): Amazon Nova Sonic (bolo.duplex.nova_sonic)
+NOVA_DIALECT = "nova-sonic"
+
+
+def _cloud_provider(core: Bolo, spec: ModelSpec) -> Any:
+    return core.providers.find(
+        str(spec.options.get("provider") or "") or None, str(spec.options.get("provider_kind") or "") or None
+    )
+
+
 def readiness(core: Bolo, spec: ModelSpec) -> tuple[bool, bool, str | None]:
     """``(configured, available, reason)`` of a full-duplex ``s2s_model``."""
     from bolo.duplex import runtime
 
     s = core.settings
+    if spec.cloud:
+        from bolo.duplex.nova_sonic import sdk_missing
+        from bolo.providers import key_env
+
+        if spec.options.get("dialect") != NOVA_DIALECT:
+            return True, False, f"model '{spec.id}' is a cloud model no full-duplex backend serves"
+        provider = _cloud_provider(core, spec)
+        if provider is None or not provider.configured:
+            name = str(spec.options.get("provider") or "bedrock")
+            return (
+                False,
+                False,
+                (
+                    f"the cloud provider '{name}' is not configured (set {key_env(name)} to "
+                    "<access key id>:<secret access key>, or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY)"
+                ),
+            )
+        problem = sdk_missing()
+        return True, problem is None, problem
     if spec.kind not in KINDS:
         return True, False, f"model '{spec.id}' is of kind {spec.kind!r}, which no full-duplex backend serves"
     problem = _codec_missing()
@@ -93,6 +122,25 @@ async def build_backend(core: Bolo, spec: ModelSpec) -> DuplexBackend:
     from bolo.engines.tts_server import free_port
 
     s = core.settings
+    if spec.cloud:
+        from bolo.duplex.nova_sonic import NovaSonicBackend, bedrock_settings
+
+        if spec.options.get("dialect") != NOVA_DIALECT:
+            raise EngineUnavailable(f"model '{spec.id}' is a cloud model no full-duplex backend serves")
+        provider = core.providers.require(
+            str(spec.options.get("provider") or "") or None,
+            str(spec.options.get("provider_kind") or "") or None,
+            model=spec.id,
+        )
+        region, endpoint, credentials = bedrock_settings(provider)
+        return NovaSonicBackend(
+            model=spec.id, model_id=str(spec.options.get("model") or ""), region=region, endpoint_uri=endpoint,
+            credentials=credentials, provider=provider.name,
+            max_sessions=int(spec.options.get("max_sessions") or 20),
+            default_voice=str(spec.options.get("default_voice") or "matthew"),
+            sensitivity=str(spec.options.get("endpointing_sensitivity") or "") or None,
+            tail_s=s.duplex_silence_ms / 1000.0 + 0.2,
+        )  # fmt: skip
     if spec.kind not in KINDS:
         raise EngineUnavailable(f"model '{spec.id}' is of kind {spec.kind!r}, which no full-duplex backend serves")
     problem = _codec_missing()

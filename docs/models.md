@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-532 models: 233 validated on CPU by the maintainers, 299 untested. 32 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+532 models: 233 validated on CPU by the maintainers, 299 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -989,6 +989,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `rime-prism` | en | realtime | native | none (cloud API) | Rime Terms of Service (paid cloud API) · [terms](https://www.rime.ai/terms) · needs provider `rime` (key: `BOLO_PROVIDER_RIME_API_KEY`) | untested |
+
+#### Amazon Nova (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `amazon-nova-2.5-sonic` | en, fr, it, de, es, pt +1 | realtime | native | none (cloud API) | AWS Service Terms (paid cloud API) · [terms](https://aws.amazon.com/service-terms/) · needs provider `bedrock` (key: `BOLO_PROVIDER_BEDROCK_API_KEY`) | untested |
 
 #### Moshi
 

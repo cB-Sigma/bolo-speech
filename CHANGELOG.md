@@ -94,6 +94,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   over the realtime socket of a Microsoft Foundry resource (bolo commits at pauses, since MAI detects no speech
   itself; recorded audio goes over the same socket), and 97 voices in 23 languages through Azure Speech. All public
   previews. MAI Realtime 1 is not included: it is in limited-access preview without a public API reference.
+- **Amazon Nova 2.5 Sonic as a full-duplex cloud model** (`s2s_model = "amazon-nova-2.5-sonic"`, launched
+  2026-10-05): Amazon Bedrock's bidirectional stream behind bolo's full-duplex bridge (Nova detects turns and
+  barge-in itself), with instructions and Nova's voices. Provider kind `bedrock`: `BOLO_PROVIDER_BEDROCK_API_KEY` as
+  `<access key id>:<secret access key>`, or AWS's own variables; the option `region`. Needs AWS's SDK, the new extra
+  `bolo-speech[nova]` (Python 3.12 or newer). Function tools are not passed on.
 - **Every cloud entry names the environment variable of its key**: `provider.key_env` in `GET /api/v1/catalog`
   (`BOLO_PROVIDER_<NAME>_API_KEY`), and the cloud rows of docs/models.md.
 

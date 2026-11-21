@@ -34,7 +34,9 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("bolo.providers")
 
-KINDS = ("openai-compatible", "sarvam", "elevenlabs", "deepgram", "soniox", "assemblyai", "xai", "rime", "azure-mai")
+KINDS = (
+    "openai-compatible", "sarvam", "elevenlabs", "deepgram", "soniox", "assemblyai", "xai", "rime", "azure-mai", "bedrock",
+)  # fmt: skip
 DEFAULT_BASE_URLS = {
     "openai-compatible": "https://api.openai.com/v1",
     "sarvam": "https://api.sarvam.ai",
@@ -47,6 +49,8 @@ DEFAULT_BASE_URLS = {
     # an Azure resource has its own address: the placeholder is never contacted (the provider is not configured
     # until base_url names the resource)
     "azure-mai": "https://your-resource.services.ai.azure.com",
+    # Amazon Bedrock's runtime in a Region (the option region picks another; Nova Sonic only, bolo.duplex.nova_sonic)
+    "bedrock": "https://bedrock-runtime.us-east-1.amazonaws.com",
 }
 #: kinds whose default base_url is a placeholder for the operator's own resource
 NEEDS_BASE_URL = ("azure-mai",)
@@ -61,6 +65,7 @@ KIND_BY_NAME = {
     "xai": "xai",
     "rime": "rime",
     "azure-mai": "azure-mai",
+    "bedrock": "bedrock",
 }
 TERMS = {
     "openai-compatible": "https://openai.com/policies/services-agreement/",
@@ -72,6 +77,7 @@ TERMS = {
     "xai": "https://x.ai/legal/terms-of-service",
     "rime": "https://www.rime.ai/terms",
     "azure-mai": "https://azure.microsoft.com/support/legal/preview-supplemental-terms/",
+    "bedrock": "https://aws.amazon.com/service-terms/",
 }
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
@@ -172,6 +178,8 @@ class ProviderConfig:
         server (those often need none)."""
         if self.kind in NEEDS_BASE_URL and self.is_default_host:
             return False
+        if self.kind == "bedrock" and not self.api_key:  # AWS's SDK finds credentials in the environment itself
+            return bool(os.environ.get("AWS_ACCESS_KEY_ID") and os.environ.get("AWS_SECRET_ACCESS_KEY"))
         return bool(self.api_key) or (self.kind == "openai-compatible" and not self.is_default_host)
 
     def public(self) -> dict[str, Any]:

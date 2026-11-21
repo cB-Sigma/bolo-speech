@@ -736,3 +736,152 @@ class FakeCloudSockets:
                                           "end_of_turn_confidence": 0.1, "words": words(False), "utterance": ""}))  # fmt: skip
             if silence >= 0.4 and speech > 0:
                 await end_turn()
+
+
+# ---- Amazon Nova Sonic (a stand-in for the stream of AWS's SDK) ----------------------------------------------------
+class _Chunk:
+    """What AWS's SDK hands over: an event whose ``value.bytes_`` is the event JSON."""
+
+    def __init__(self, data: bytes) -> None:
+        self.value = type("Part", (), {"bytes_": data})()
+
+
+class InvokeModelWithBidirectionalStreamOutputValidationException:
+    def __init__(self, message: str) -> None:
+        self.value = type("Error", (), {"message": message})()
+
+
+class FakeNovaStream:
+    """One ``InvokeModelWithBidirectionalStream`` call, answering as the Nova 2 Sonic user guide describes: the input
+    events must come in order (``sessionStart``, ``promptStart`` with 24 kHz LPCM output and a known ``voiceId``,
+    optional ``SYSTEM`` text content, then the ``USER`` audio content at 16 kHz); after ``pause_s`` of silence
+    following speech, a completion: the user's ASR text (FINAL), the planned reply (SPECULATIVE)
+    ``"I heard <seconds> seconds."``, its audio (0.1 s of tone per word, ``word_delay_s`` apart) and the spoken text
+    (FINAL); speech during the audio stops it (``contentEnd`` with ``stopReason: INTERRUPTED``). ``fail`` answers the
+    first input with the stream's validation exception instead."""
+
+    VOICES = ("tiffany", "matthew", "amy", "olivia", "kiara", "arjun", "ambre", "florian", "beatrice", "lorenzo",
+              "tina", "lennart", "lupe", "carlos", "carolina", "leo")  # fmt: skip
+
+    def __init__(self, pause_s: float = 1.5, word_delay_s: float = 0.05, fail: str | None = None) -> None:
+        self.events: list[dict[str, Any]] = []
+        self.pause_s = pause_s
+        self.word_delay_s = word_delay_s
+        self.fail = fail
+        self.closed = False
+        self.replies = 0
+        self.barge_ins = 0
+        self._out: asyncio.Queue[Any] = asyncio.Queue()
+        self._prompt: str | None = None
+        self._audio_content: str | None = None
+        self._speech = self._silence = 0.0
+        self._speaking: asyncio.Task[None] | None = None
+        self._interrupt = asyncio.Event()
+        self.input_stream = self  # send() and close() as AWS's input stream has them
+        self.audio_seconds = 0.0
+
+    def _emit(self, name: str, body: dict[str, Any]) -> None:
+        self._out.put_nowait(_Chunk(json.dumps({"event": {name: body}}).encode()))
+
+    def _refuse(self, message: str) -> None:
+        self._out.put_nowait(InvokeModelWithBidirectionalStreamOutputValidationException(message))
+        self._out.put_nowait(None)
+
+    async def send(self, chunk: Any) -> None:
+        event = json.loads(chunk.value.bytes_)["event"]
+        ((name, body),) = event.items()
+        self.events.append({name: {k: v for k, v in body.items() if k != "content" or name != "audioInput"}})
+        if self.fail:
+            self._refuse(self.fail)
+            self.fail = None
+            return
+        names = [next(iter(e)) for e in self.events]
+        if name == "sessionStart" and names != ["sessionStart"]:
+            self._refuse("sessionStart must be the first event")
+        elif name == "promptStart":
+            out = body.get("audioOutputConfiguration") or {}
+            if out.get("sampleRateHertz") not in (8000, 16000, 24000) or out.get("voiceId") not in self.VOICES:
+                self._refuse(f"invalid audioOutputConfiguration {out}")
+            self._prompt = body.get("promptName")
+        elif name == "contentStart":
+            if body.get("promptName") != self._prompt:
+                self._refuse("unknown promptName")
+            elif body.get("type") == "AUDIO":
+                cfg = body.get("audioInputConfiguration") or {}
+                if cfg.get("sampleRateHertz") != 16000 or body.get("role") != "USER":
+                    self._refuse(f"invalid audioInputConfiguration {cfg}")
+                self._audio_content = body.get("contentName")
+        elif name == "audioInput":
+            if body.get("contentName") != self._audio_content or self._audio_content is None:
+                self._refuse("audioInput outside an audio content")
+                return
+            x = np.frombuffer(base64.b64decode(body["content"]), dtype="<i2")
+            secs = len(x) / 16000
+            self.audio_seconds += secs
+            loud = bool(len(x)) and float(np.abs(x).max()) > 300
+            if loud:
+                self._speech += secs
+                self._silence = 0.0
+                if self._speaking is not None and not self._speaking.done() and self._speech >= 0.3:
+                    self._interrupt.set()
+            elif self._speech > 0:
+                self._silence += secs
+            if self._speech > 0 and self._silence >= self.pause_s and (self._speaking is None or self._speaking.done()):
+                heard, self._speech, self._silence = self._speech, 0.0, 0.0
+                self._interrupt.clear()
+                self._speaking = asyncio.get_running_loop().create_task(self._reply(heard))
+        elif name == "sessionEnd":
+            self._out.put_nowait(None)
+
+    async def _reply(self, heard: float) -> None:
+        self.replies += 1
+        ids = {"sessionId": "s1", "promptName": self._prompt, "completionId": f"c{self.replies}"}
+        self._emit("completionStart", ids)
+        for role, stage, text in (("USER", "FINAL", "the caller's words"), ("ASSISTANT", "SPECULATIVE", None)):
+            content = f"{role}-{stage}-{self.replies}"
+            reply = text or f"I heard {heard:.1f} seconds."
+            self._emit("contentStart", {**ids, "contentId": content, "type": "TEXT", "role": role,
+                                        "additionalModelFields": json.dumps({"generationStage": stage}),
+                                        "textOutputConfiguration": {"mediaType": "text/plain"}})  # fmt: skip
+            self._emit("textOutput", {**ids, "contentId": content, "content": reply})
+            self._emit("contentEnd", {**ids, "contentId": content, "stopReason": "PARTIAL_TURN", "type": "TEXT"})
+        audio_id = f"audio-{self.replies}"
+        self._emit("contentStart", {**ids, "contentId": audio_id, "type": "AUDIO", "role": "ASSISTANT",
+                                    "audioOutputConfiguration": {"mediaType": "audio/lpcm", "sampleRateHertz": 24000}})  # fmt: skip
+        words = f"I heard {heard:.1f} seconds.".split()
+        stop = "END_TURN"
+        for _ in words * 4:  # 0.4 s of tone per word: long enough to be talked over
+            if self._interrupt.is_set():
+                stop = "INTERRUPTED"
+                self.barge_ins += 1
+                break
+            t = np.arange(2400) / 24000
+            pcm = (0.3 * np.sin(2 * np.pi * 300 * t) * 32767).astype("<i2").tobytes()
+            self._emit("audioOutput", {**ids, "contentId": audio_id, "content": base64.b64encode(pcm).decode()})
+            await asyncio.sleep(self.word_delay_s)
+        self._emit("contentEnd", {**ids, "contentId": audio_id, "stopReason": stop, "type": "AUDIO"})
+        final_id = f"ASSISTANT-FINAL-{self.replies}"
+        self._emit("contentStart", {**ids, "contentId": final_id, "type": "TEXT", "role": "ASSISTANT",
+                                    "additionalModelFields": json.dumps({"generationStage": "FINAL"})})  # fmt: skip
+        self._emit("textOutput", {**ids, "contentId": final_id, "content": " ".join(words)})
+        self._emit("contentEnd", {**ids, "contentId": final_id, "stopReason": stop, "type": "TEXT"})
+        self._emit("completionEnd", {**ids, "stopReason": stop})
+
+    async def close(self) -> None:
+        self.closed = True
+        self._out.put_nowait(None)
+
+    async def await_output(self) -> tuple[None, Any]:
+        async def receive() -> Any:
+            while True:
+                item = await self._out.get()
+                if item is None:
+                    return
+                yield item
+
+        return None, receive()
+
+
+def nova_chunk(data: bytes) -> _Chunk:
+    """The stand-in for ``InvokeModelWithBidirectionalStreamInputChunk(value=BidirectionalInputPayloadPart(...))``."""
+    return _Chunk(data)

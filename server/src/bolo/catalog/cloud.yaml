@@ -3222,3 +3222,106 @@
     model: MAI-Voice-2.1-Flash
     default_voice: en-US-Harper
     workers: 4
+- id: amazon-nova-2.5-sonic
+  task: speech-to-speech
+  engine: remote
+  kind: remote-speech-to-speech
+  family: Amazon Nova (cloud)
+  languages:
+  - en
+  - fr
+  - it
+  - de
+  - es
+  - pt
+  - hi
+  tier: realtime
+  streaming: true
+  sample_rate: 24000
+  license: AWS Service Terms (paid cloud API)
+  license_url: https://aws.amazon.com/service-terms/
+  cloud: true
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Amazon Nova 2.5 Sonic (amazon.nova-2-5-sonic, launched 2026-10-05) through Amazon Bedrock: a
+    speech-to-speech model that listens all the time, decides itself when the caller has finished (a pause of 1.5 to
+    2 s) and stops when talked over, so it runs behind bolo''s full-duplex bridge (s2s_model = "amazon-nova-2.5-sonic").
+    Instructions as its system prompt; Nova''s voices (matthew by default; tiffany and matthew speak every supported
+    language). Function tools are not passed on. Needs AWS''s SDK (pip install "bolo-speech[nova]", Python 3.12 or
+    newer) and credentials: BOLO_PROVIDER_BEDROCK_API_KEY as <access key id>:<secret access key>, or AWS_ACCESS_KEY_ID
+    and AWS_SECRET_ACCESS_KEY; Regions us-east-1, us-west-2, eu-north-1, ap-northeast-1 (option region). Paid cloud API:
+    the conversation''s audio leaves this server.'
+  source_url: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-2-5-sonic.html
+  validated: untested
+  voices:
+  - id: matthew
+    name: Matthew
+    language: en-US
+    gender: m
+  - id: tiffany
+    name: Tiffany
+    language: en-US
+    gender: f
+  - id: amy
+    name: Amy
+    language: en-GB
+    gender: f
+  - id: olivia
+    name: Olivia
+    language: en-AU
+    gender: f
+  - id: kiara
+    name: Kiara
+    language: en-IN
+    gender: f
+  - id: arjun
+    name: Arjun
+    language: en-IN
+    gender: m
+  - id: ambre
+    name: Ambre
+    language: fr-FR
+    gender: f
+  - id: florian
+    name: Florian
+    language: fr-FR
+    gender: m
+  - id: beatrice
+    name: Beatrice
+    language: it-IT
+    gender: f
+  - id: lorenzo
+    name: Lorenzo
+    language: it-IT
+    gender: m
+  - id: tina
+    name: Tina
+    language: de-DE
+    gender: f
+  - id: lennart
+    name: Lennart
+    language: de-DE
+    gender: m
+  - id: lupe
+    name: Lupe
+    language: es-US
+    gender: f
+  - id: carlos
+    name: Carlos
+    language: es-US
+    gender: m
+  - id: carolina
+    name: Carolina
+    language: pt-BR
+    gender: f
+  - id: leo
+    name: Leo
+    language: pt-BR
+    gender: m
+  options:
+    provider: bedrock
+    provider_kind: bedrock
+    model: amazon.nova-2-5-sonic
+    dialect: nova-sonic
+    default_voice: matthew

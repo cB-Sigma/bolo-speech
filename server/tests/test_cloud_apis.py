@@ -18,7 +18,7 @@ import websockets
 from bolo.catalog import Catalog
 from bolo.config import Settings
 from conftest import LiveServer, speechlike, wav_bytes
-from fake_cloud_apis import KEY, FakeCloudHTTP, FakeCloudSockets
+from fake_cloud_apis import KEY, FakeCloudHTTP, FakeCloudSockets, FakeNovaStream, nova_chunk
 from test_realtime import b64_pcm24
 from test_s2s import TOOLS, connect, until, update
 from test_ws import pcm16, stream_audio
@@ -105,6 +105,7 @@ NEW_ENTRIES = {
     "mai-transcribe-2-streaming": ("azure-mai", "MAI-Transcribe-2-Streaming", True),
     "mai-voice-2.1": ("azure-mai", "MAI-Voice-2.1", False),
     "mai-voice-2.1-flash": ("azure-mai", "MAI-Voice-2.1-Flash", False),
+    "amazon-nova-2.5-sonic": ("bedrock", "amazon.nova-2-5-sonic", True),
 }
 
 
@@ -525,3 +526,164 @@ def test_mai_voice(srv: LiveServer, http: FakeCloudHTTP) -> None:
         f"{srv.url}/v1/audio/speech", json={"model": "mai-voice-2.1", "input": "Hi.", "speed": 1.5}, timeout=60
     )
     assert r.status_code == 400 and r.json()["error"]["param"] == "speed"
+
+
+# -- Amazon Nova 2.5 Sonic (Bedrock, through AWS's SDK: a stand-in stream) ------------------------------------------
+#: not real AWS credentials: an id and a secret of the documented form, for bolo to split and pass on
+BEDROCK_KEY = "TESTACCESSKEYIDNOTREAL:test-secret-not-real-0b5e"
+NOVA_SESSION = {
+    "type": "realtime", "pipeline": "speech-to-speech", "instructions": "Answer in one sentence.",
+    "audio": {"input": {"transcription": {"model": "fake-stt"},
+                        "turn_detection": {"type": "server_vad", "silence_duration_ms": 300}},
+              "output": {"voice": "tiffany"}},
+}  # fmt: skip
+
+
+@contextlib.contextmanager
+def nova_server(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch, stream: FakeNovaStream
+) -> Iterator[tuple[LiveServer, list[Any]]]:
+    from bolo.duplex import nova_sonic
+
+    opened: list[Any] = []
+
+    async def open_stream(backend: Any) -> tuple[FakeNovaStream, Any]:
+        opened.append(backend)
+        return stream, nova_chunk
+
+    monkeypatch.setattr(nova_sonic.NovaSonicBackend, "_open_stream", open_stream)
+    monkeypatch.setattr(nova_sonic, "sdk_missing", lambda: None)  # AWS's SDK is stood in for
+    settings.providers = {"bedrock": {"api_key": BEDROCK_KEY, "options": {"region": "eu-north-1"}}}
+    settings.s2s_model = "amazon-nova-2.5-sonic"
+    settings.duplex_silence_ms = 400
+    settings.duplex_jitter_ms = 100
+    server = LiveServer(settings)
+    server.start()
+    try:
+        yield server, opened
+    finally:
+        server.stop()
+
+
+def nova_speech(speech_s: float, quiet_s: float) -> list[str]:
+    import base64
+
+    audio = np.concatenate([speechlike(speech_s, 24000), np.zeros(int(quiet_s * 24000), dtype=np.float32)])
+    pcm = (np.clip(audio, -1, 1) * 32767).astype("<i2").tobytes()
+    return [base64.b64encode(pcm[i : i + 4800]).decode() for i in range(0, len(pcm), 4800)]
+
+
+async def test_nova_sonic_session(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    stream = FakeNovaStream()
+    with nova_server(settings, monkeypatch, stream) as (server, opened):
+        info = httpx.get(f"{server.url}/api/v1/info", timeout=30).json()["capabilities"]["realtime"]["pipelines"]
+        s2s = info["speech-to-speech"]
+        assert s2s["full_duplex"] is True and s2s["available"] is True and s2s["configured"] is True
+        ws = await connect(server)
+        try:
+            updated = await update(ws, NOVA_SESSION)
+            assert updated["session"]["full_duplex"] is True
+            for chunk in nova_speech(1.0, 0.6):
+                await ws.send(json.dumps({"type": "input_audio_buffer.append", "audio": chunk}))
+            # the client stops sending; bolo keeps feeding silence on the clock, so Nova hears the pause and answers
+            events = await until(ws, "response.done", timeout=30)
+        finally:
+            await ws.close()
+        assert await eventually(lambda: stream.closed)
+        backend = opened[0]
+    done = next(e for e in events if e["type"] == "response.done")["response"]
+    transcript = done["output"][0]["content"][0]["transcript"]
+    # the planned (speculative) text, once: the final text that repeats it after the audio is not doubled
+    assert done["status"] == "completed" and transcript.startswith("I heard ") and transcript.count("I heard") == 1
+    assert 0.9 <= float(transcript.split()[2]) <= 1.4, transcript
+    assert any(e["type"] == "response.output_audio.delta" for e in events)
+    # what went to Bedrock, in the documented order, with the credentials split out of the key
+    names = [next(iter(e)) for e in stream.events]
+    assert names[:6] == ["sessionStart", "promptStart", "contentStart", "textInput", "contentEnd", "contentStart"]
+    prompt = stream.events[1]["promptStart"]["audioOutputConfiguration"]
+    assert prompt["voiceId"] == "tiffany" and prompt["sampleRateHertz"] == 24000 and prompt["encoding"] == "base64"
+    assert stream.events[3]["textInput"]["content"] == "Answer in one sentence."
+    assert stream.events[2]["contentStart"]["role"] == "SYSTEM" and stream.events[5]["contentStart"]["type"] == "AUDIO"
+    assert names[-3:] == ["contentEnd", "promptEnd", "sessionEnd"]
+    assert stream.audio_seconds > 1.6  # what the client sent plus bolo's silence on the clock
+    assert (backend.model_id, backend.region) == ("amazon.nova-2-5-sonic", "eu-north-1")
+    assert backend.endpoint_uri == "https://bedrock-runtime.eu-north-1.amazonaws.com"
+    assert backend.credentials == {
+        "aws_access_key_id": "TESTACCESSKEYIDNOTREAL",
+        "aws_secret_access_key": "test-secret-not-real-0b5e",
+    }
+    assert "test-secret" not in json.dumps(info)
+
+
+async def test_nova_sonic_barge_in(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    stream = FakeNovaStream(word_delay_s=0.25)  # a long answer
+    with nova_server(settings, monkeypatch, stream) as (server, _):
+        ws = await connect(server)
+        try:
+            await update(ws, NOVA_SESSION)
+            for chunk in nova_speech(1.0, 0.6):
+                await ws.send(json.dumps({"type": "input_audio_buffer.append", "audio": chunk}))
+            await until(ws, "response.output_audio.delta", timeout=30)
+            for chunk in nova_speech(1.0, 0.0):  # the caller talks over it: Nova stops and says so
+                await ws.send(json.dumps({"type": "input_audio_buffer.append", "audio": chunk}))
+            events = await until(ws, "response.done", timeout=30)
+        finally:
+            await ws.close()
+    done = events[-1]["response"]
+    assert done["status"] == "cancelled" and done["status_details"]["reason"] == "turn_detected"
+    assert stream.barge_ins == 1
+
+
+async def test_nova_sonic_refusal_and_readiness(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    stream = FakeNovaStream(fail="Invalid input request, please fix your input and try again.")
+    with nova_server(settings, monkeypatch, stream) as (server, _):
+        ws = await connect(server)
+        try:
+            await update(ws, NOVA_SESSION)
+            for chunk in nova_speech(0.5, 0.2):
+                await ws.send(json.dumps({"type": "input_audio_buffer.append", "audio": chunk}))
+            error = (await until(ws, "error", timeout=30))[-1]["error"]
+        finally:
+            await ws.close()
+    assert "ValidationException" in error["message"] and "fix your input" in error["message"]
+    # no credentials anywhere: not configured, and what to set is named
+    monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
+    settings.providers = {}
+    server = LiveServer(settings)
+    server.start()
+    try:
+        s2s = httpx.get(f"{server.url}/api/v1/info", timeout=30).json()["capabilities"]["realtime"]["pipelines"]
+        reason = s2s["speech-to-speech"]["reason"]
+        assert s2s["speech-to-speech"]["configured"] is False
+        assert "BOLO_PROVIDER_BEDROCK_API_KEY" in reason and "AWS_ACCESS_KEY_ID" in reason
+    finally:
+        server.stop()
+
+
+def test_bedrock_settings_and_sdk_hint(monkeypatch: pytest.MonkeyPatch) -> None:
+    import sys
+
+    from bolo.duplex.nova_sonic import bedrock_settings, sdk_missing
+    from bolo.providers import ProviderConfig
+
+    cfg = ProviderConfig.from_dict(
+        "bedrock", {"api_key": "ID1:SECRET1:TOKEN1", "base_url": "https://bedrock-runtime.ap-northeast-1.amazonaws.com"}
+    )
+    assert bedrock_settings(cfg) == (
+        "ap-northeast-1", "https://bedrock-runtime.ap-northeast-1.amazonaws.com",
+        {"aws_access_key_id": "ID1", "aws_secret_access_key": "SECRET1", "aws_session_token": "TOKEN1"},
+    )  # fmt: skip
+    cfg = ProviderConfig.from_dict(
+        "bedrock", {"api_key": "SECRET2", "options": {"access_key_id": "ID2", "region": "us-west-2"}}
+    )
+    assert bedrock_settings(cfg)[0] == "us-west-2"
+    assert bedrock_settings(cfg)[2] == {"aws_access_key_id": "ID2", "aws_secret_access_key": "SECRET2"}
+    # without a key, AWS's own variables make the provider usable (AWS's SDK reads them)
+    bare = ProviderConfig.from_dict("bedrock", {})
+    monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
+    assert bare.configured is False
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "ID3")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "SECRET3")
+    assert bare.configured is True
+    monkeypatch.setitem(sys.modules, "aws_sdk_bedrock_runtime", None)  # not installed
+    assert "bolo-speech[nova]" in (sdk_missing() or "")

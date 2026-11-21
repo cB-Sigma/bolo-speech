@@ -578,6 +578,14 @@ realtime_pipeline = "speech-to-speech"
 s2s_model = "moshiko-pytorch-q8"        # or moshika-*, hibiki-*, personaplex-7b-v1 ... (models.md)
 ```
 
+One cloud model runs the same way: **Amazon Nova 2.5 Sonic** (`s2s_model = "amazon-nova-2.5-sonic"`) through Amazon
+Bedrock. It listens all the time, answers after a pause of 1.5 to 2 s that it detects itself, and stops when talked
+over; bolo streams the caller's audio to it (with silence on the clock) and cuts its speech into responses. It needs
+AWS's SDK (`pip install "bolo-speech[nova]"`, Python 3.12 or newer) and credentials (a provider of kind `bedrock`:
+`BOLO_PROVIDER_BEDROCK_API_KEY` as `<access key id>:<secret access key>`, or `AWS_ACCESS_KEY_ID` and
+`AWS_SECRET_ACCESS_KEY`). A paid cloud API: the conversation's audio leaves this server. See
+[providers.md](providers.md#amazon-nova-sonic).
+
 ```bash
 bolo components install moshi          # Kyutai's server: PyTorch + CUDA on Linux/Windows, MLX on Apple silicon
 bolo pull moshiko-pytorch-q8           # 8.4 GB, CC-BY-4.0, files pinned by SHA-256

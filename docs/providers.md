@@ -45,12 +45,13 @@ A provider has a name, a `kind`, a base URL, an API key, options and an optional
 | `azure-mai` | Microsoft's MAI models in Azure: MAI-Transcribe-2-Streaming (the realtime socket of a Foundry resource) and MAI-Voice-2.1 (Azure Speech's text-to-speech route) | none: set it to your resource, `https://<resource>.services.ai.azure.com`; the voices need the option `region` (or `tts_url`) | `api-key: <key>` (socket), `Ocp-Apim-Subscription-Key: <key>` (voices) |
 | `xai` | xAI (speech-to-speech only: the Voice Agent API, `s2s_model`) | `https://api.x.ai/v1` (`wss://api.x.ai/v1/realtime`) | `Authorization: Bearer <key>` |
 | `rime` | Rime (speech-to-speech only: Prism, `s2s_model`) | `https://prism.api.rime.ai/v1` (`wss://prism.api.rime.ai/v1/realtime`) | `Authorization: Bearer <key>` |
+| `bedrock` | Amazon Bedrock (speech-to-speech only: Nova Sonic, `s2s_model`), through AWS's SDK | `https://bedrock-runtime.us-east-1.amazonaws.com` (option `region` for another) | SigV4, signed by AWS's SDK: the key is `<access key id>:<secret access key>[:<session token>]`, or none to use AWS's own variables |
 
 In the configuration file, one table per provider:
 
 ```toml
 [providers.openai]                 # the names openai, sarvam, elevenlabs, deepgram, soniox, assemblyai,
-                                   # azure-mai, xai and rime imply their kind
+                                   # azure-mai, xai, rime and bedrock imply their kind
 api_key = "…"
 
 [providers.sarvam]
@@ -146,10 +147,11 @@ soon as its provider is configured**, and `GET /v1/models` lists it from then on
 | `mai-voice-2.1`, `mai-voice-2.1-flash` | `MAI-Voice-2.1`, `MAI-Voice-2.1-Flash` | TTS | 97 voices in 23 languages through Azure Speech (public preview); `en-US-Harper` unless the request names one |
 | `xai-grok-voice-3.0` | `grok-voice-3.0` | speech-to-speech | `s2s_model` (see [Cloud speech-to-speech](#cloud-speech-to-speech-openai-realtime)) |
 | `rime-prism` | `prism` | speech-to-speech | `s2s_model` (see [Cloud speech-to-speech](#cloud-speech-to-speech-openai-realtime)) |
+| `amazon-nova-2.5-sonic` | `amazon.nova-2-5-sonic` | speech-to-speech, full-duplex | `s2s_model` (see [Amazon Nova Sonic](#amazon-nova-sonic)) |
 | `assemblyai-stt-3.7-realtime`, `assemblyai-stt-3.7-realtime-agent` | `assemblyai-stt-3-7-realtime`, `…-realtime-agent` | STT | live (AssemblyAI's Streaming API v3, with interim text and AssemblyAI's turn detection) with speaker labels on the socket; the `-agent` model is the one tuned for voice agents. Recorded audio and Realtime turns go to `assemblyai-stt-3-7` |
 
 An entry looks for a provider with the name in its `options.provider` (`openai`, `sarvam`,
-`elevenlabs`, `deepgram`, `soniox`, `assemblyai`, `azure-mai`, `xai`, `rime`). If you called the account something else, the first configured
+`elevenlabs`, `deepgram`, `soniox`, `assemblyai`, `azure-mai`, `xai`, `rime`, `bedrock`). If you called the account something else, the first configured
 provider of the same kind at the vendor's own address is used.
 
 ### Any other model: `provider:model`
@@ -515,6 +517,39 @@ s2s_model = "xai-grok-voice-3.0"           # or "rime-prism"
 Microsoft's MAI Realtime 1 is not offered: it is in limited-access preview without a public API
 reference.
 
+### Amazon Nova Sonic
+
+`s2s_model = "amazon-nova-2.5-sonic"` runs Amazon Nova 2.5 Sonic (launched 2026-10-05; us-east-1,
+us-west-2, eu-north-1 and ap-northeast-1) through Amazon Bedrock's `InvokeModelWithBidirectionalStream`.
+Nova Sonic is not turn-based: it listens all the time, detects the end of the caller's turn itself (a
+pause of 1.5, 1.75 or 2 s by `endpointingSensitivity` HIGH, MEDIUM or LOW; the model option
+`endpointing_sensitivity` sets it) and stops when talked over. So it runs behind bolo's full-duplex
+bridge, as Moshi does ([voice-agents.md](voice-agents.md)): bolo streams the caller's audio at 16 kHz,
+with silence when the client sends none, and cuts the model's 24 kHz speech into responses.
+
+- **Transport.** AWS's Python SDK (`pip install "bolo-speech[nova]"`: `aws-sdk-bedrock-runtime` with
+  awscrt for HTTP/2; Python 3.12 or newer) signs the request (SigV4) and frames the event stream; bolo
+  sends Nova's JSON events through it, as AWS's own example does. Without the SDK, `/api/v1/info`
+  says what to install and a session answers 424.
+- **Credentials.** A provider of kind `bedrock`: its key is `<access key id>:<secret access key>`
+  (optionally `:<session token>`; or the secret alone with the option `access_key_id`), so one variable
+  holds it: `BOLO_PROVIDER_BEDROCK_API_KEY`. Without a key, AWS's SDK reads `AWS_ACCESS_KEY_ID` and
+  `AWS_SECRET_ACCESS_KEY` itself. The Region is the option `region` (default us-east-1).
+- **Events.** `sessionStart` (inference settings, turn detection), `promptStart` (LPCM at 24 kHz out, the
+  voice), the session's instructions as a `SYSTEM` text content, then one `USER` audio content carrying
+  `audioInput` for the whole session; `contentEnd`, `promptEnd` and `sessionEnd` when it closes. Back:
+  the planned text of each reply (`generationStage: SPECULATIVE`) becomes the response's transcript (the
+  `FINAL` text, which repeats it after the audio, is not passed on twice), `audioOutput` the response's
+  audio, and `contentEnd` with `stopReason: INTERRUPTED` ends the response as cancelled
+  (`turn_detected`).
+- **Voices.** `matthew` (the entry's default) and `tiffany` speak every supported language; `amy`,
+  `olivia`, `kiara`, `arjun`, `ambre`, `florian`, `beatrice`, `lorenzo`, `tina`, `lennart`, `lupe`,
+  `carlos`, `carolina` and `leo` are per language. A voice Nova does not have (an OpenAI name) uses the
+  default.
+- **Not passed on.** Function tools (the full-duplex bridge carries no tool calls), Nova's transcript
+  of the caller (bolo transcribes the caller itself), and earlier conversation. A Bedrock stream lasts at
+  most 8 minutes; the default quota is 20 concurrent sessions per account and Region.
+
 Not done: Gemini Live (a different protocol: `BidiGenerateContent` over WebSocket with its own
 setup, audio and tool messages; it would be a third backend class), cost estimates for
 token-priced Realtime usage (the provider's `usage` is passed to the client in `response.done`),
@@ -543,7 +578,7 @@ and OpenAI's Realtime *transcription* sessions as a live socket for the STT WebS
 | `GET /api/v1/providers/{name}` | one provider |
 | `PUT /api/v1/providers/{name}` `{kind?, base_url?, api_key?, clear_api_key?, options?, prices?}` | adds or changes a stored provider. `api_key` is write-only: absent or empty keeps the stored key, `clear_api_key: true` removes it. Loaded models of the provider are unloaded so the change takes effect. `400` for a provider that comes from the configuration, an unknown kind or field, or when editing is not allowed |
 | `DELETE /api/v1/providers/{name}` | `204`; `400` for a provider from the configuration |
-| `POST /api/v1/providers/{name}/test` | one cheap request with the stored key: `{name, ok, message, code, checked: "credentials"\|"reachability", latency_ms}`. `credentials`: the key was accepted (OpenAI-compatible: `GET /models`; ElevenLabs: `GET /v2/voices`; Deepgram: `GET /v1/projects`; Soniox: `GET /v1/models`). `reachability`: the address answered and did not refuse the key, but nothing proves the key (Sarvam documents no free read-only request; a refused key is still reported as a failure). AssemblyAI: `GET /v2/transcript?limit=1`; xAI: `GET /v1/tts/voices`; Rime and Azure MAI: the WebSocket handshake, closed right after `session.created`, before any configuration or audio (all `credentials`) |
+| `POST /api/v1/providers/{name}/test` | one cheap request with the stored key: `{name, ok, message, code, checked: "credentials"\|"reachability", latency_ms}`. `credentials`: the key was accepted (OpenAI-compatible: `GET /models`; ElevenLabs: `GET /v2/voices`; Deepgram: `GET /v1/projects`; Soniox: `GET /v1/models`). `reachability`: the address answered and did not refuse the key, but nothing proves the key (Sarvam documents no free read-only request; a refused key is still reported as a failure). AssemblyAI: `GET /v2/transcript?limit=1`; xAI: `GET /v1/tts/voices`; Rime and Azure MAI: the WebSocket handshake, closed right after `session.created`, before any configuration or audio (all `credentials`); Amazon Bedrock: that credentials are set and the Region's `bedrock-runtime` answers (`reachability`: requests are signed by AWS's SDK, and there is no free signed one) |
 
 Events: `provider` `{name, event: "saved"|"removed"}` on `GET /api/v1/events`.
 
@@ -562,6 +597,7 @@ Read on 2026-11-14:
 | xAI (read 2026-11-21) | `docs.x.ai` (model-capabilities/audio/speech-to-speech, voice, text-to-speech; rest-api-reference/inference/voice; `voice-realtime.ws.json`) | `grok-voice-3.0` (`grok-voice-latest`; 2.0 deprecated, the same endpoint, session and events), the address and header, the session fields and their JSON schema (nested function tools, `turn_detection.type` null for manual turns, PCM rates), `response.create` with `modalities`, every server event name, the languages, `GET /v1/tts/voices` |
 | Rime (read 2026-11-21) | `docs.rime.ai` (api-reference/prism/websocket, prism/migrate-from-openai) | the address, Bearer on the upgrade, no query, the strict session fields, 16 kHz in and 24 kHz out, `turn_detection: null`, `response.create` and `prism_cause` (typed turns, tool continuations, acknowledgement by `conversation.item.created`), the beta event names, `response.done` statuses, voices |
 | Microsoft MAI (read 2026-11-21) | `learn.microsoft.com/azure/ai-services/speech-service/` (mai-transcribe-2-streaming, mai-transcribe-2-streaming-realtime, mai-voices) | the socket's address, `api-key`, the transcription session, `append` / `commit`, `delta` / `intermediate` / `completed`, the 60 languages; the Speech route, SSML with the model suffix, the output format of Microsoft's example, the 97 voices and 23 languages, the regions |
+| Amazon (read 2026-11-21) | `docs.aws.amazon.com` (the Bedrock model card of Nova 2.5 Sonic; the API reference of `InvokeModelWithBidirectionalStream`; the Nova 2 user guide: getting started, input events, output events, barge-in, turn-taking, language support); the source of `aws-sdk-bedrock-runtime` 0.13.1 | the model id, Regions, quota, the 8-minute stream, every input and output event and its fields, `generationStage`, `stopReason` values, the voices by language; from the SDK: the async client, `AsyncBedrockRuntimeConfig.resolve` with credentials and the awscrt transport (the guide's sample is for an older SDK) |
 | Deepgram | `developers.deepgram.com` (reference: listen-pre-recorded, listen-streaming, manage/projects/list; the pre-recorded guide; models and languages overview) | routes, `Authorization: Token`, the raw-audio upload, query parameters, `keyterm` against `keywords`, the response paths, the live socket's parameters and messages, Nova-3 and Nova-2 language codes |
 
 Not verified, or taken from memory:
@@ -605,6 +641,10 @@ Not verified, or taken from memory:
 - Microsoft MAI: whether one key serves both the Foundry socket and the Speech route (give the voices
   a second provider of kind `azure-mai` if not), the shape of `error` events, whether `completed`
   carries a language, and SSML `prosody` with MAI voices (bolo sends none).
+- Amazon Nova Sonic: nothing was run against Bedrock, and the stand-in replaces AWS's SDK, so the
+  signing and HTTP/2 framing are the SDK's and untested here. Nova Sonic's default turn-detection
+  sensitivity when none is sent, and whether `textOutput` pieces need a space between them (bolo adds
+  one), are not documented.
 - Prices: none are shipped; providers change them.
 
 ## Real tests

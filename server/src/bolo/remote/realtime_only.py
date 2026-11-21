@@ -1,5 +1,5 @@
-"""Providers bolo uses only for cloud speech-to-speech (``s2s_model``; :mod:`bolo.s2s`): xAI's Voice Agent API and
-Rime's Prism. Their adapters only check the key (``bolo providers test``); recognition and synthesis through them
+"""Providers bolo uses only for cloud speech-to-speech (``s2s_model``; :mod:`bolo.s2s` and :mod:`bolo.duplex`): xAI's
+Voice Agent API, Rime's Prism and Amazon Bedrock (Nova Sonic). Their adapters only check the key (``bolo providers test``); recognition and synthesis through them
 answer 400, as for any adapter without those APIs.
 
 * xAI (docs.x.ai, the voice reference, read 2026-11-21): ``Authorization: Bearer <key>``; ``GET
@@ -8,6 +8,9 @@ answer 400, as for any adapter without those APIs.
   WebSocket upgrade of ``wss://prism.api.rime.ai/v1/realtime``; a refused key is a ``401`` at the upgrade, before any
   event. Prism has no REST route, so the check opens the socket, waits for ``session.created`` and closes it without
   sending a ``session.update`` (no conversation is set up and no audio is sent).
+* Amazon Bedrock: requests are signed (SigV4) by AWS's SDK, which bolo uses only for Nova Sonic's stream, and there is
+  no free signed request to make, so the check says whether AWS's SDK is installed, credentials are set, and the
+  Region's ``bedrock-runtime`` endpoint answers (``reachability``).
 """
 
 from __future__ import annotations
@@ -62,3 +65,30 @@ class RimePrism(Adapter):
             message = self._clean(str((first.get("error") or {}).get("message") or "error"))
             raise ProviderError(f"{self.where} answered: {message}")
         return {"checked": "credentials", "message": "the key was accepted (the Prism socket opened)"}
+
+
+class Bedrock(Adapter):
+    kind = "bedrock"
+
+    def auth_headers(self) -> dict[str, str]:
+        return {}  # AWS's SDK signs each request; nothing is sent from here with the key
+
+    def check(self) -> dict[str, Any]:
+        import httpx
+
+        from bolo.duplex.nova_sonic import bedrock_settings, sdk_missing
+
+        if not self.provider.configured:
+            raise ProviderAuthError(f"{self.where} has no credentials (<access key id>:<secret access key> as its key)")
+        region, endpoint, _ = bedrock_settings(self.provider)
+        try:
+            status = self.client.get(endpoint + "/").status_code
+        except httpx.HTTPError as exc:
+            raise self.transport_error(exc) from exc
+        missing = sdk_missing()
+        note = f"; {missing}" if missing else ""
+        return {
+            "checked": "reachability",
+            "message": f"bedrock-runtime in {region} answered ({status}); the credentials are first used when a Nova "
+            f"Sonic session opens{note}",
+        }

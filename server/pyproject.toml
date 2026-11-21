@@ -74,6 +74,9 @@ webrtc = ["aiortc>=1.9", "av>=12"]
 # bolo frames itself and codes with libopus through PyAV. The servers themselves are components
 # (`bolo components install moshi`), each in an environment of its own.
 duplex = ["av>=12"]
+# Amazon Nova Sonic through Amazon Bedrock (bolo.duplex.nova_sonic): AWS's Python SDK (Apache-2.0) signs the requests
+# and carries the HTTP/2 event stream through awscrt (Apache-2.0); it needs Python 3.12 or newer. Not part of `all`.
+nova = ["aws-sdk-bedrock-runtime[awscrt]>=0.13,<0.14; python_version >= '3.12'"]
 # end-of-turn detection for Realtime sessions (semantic_vad) and the MarbleNet voice-activity detector.
 # faster-whisper already brings onnxruntime; tokenizers (Apache-2.0) is for the end-of-turn models that read text.
 turn = ["onnxruntime>=1.17", "tokenizers>=0.20"]
