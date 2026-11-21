@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-545 models: 239 validated on CPU by the maintainers, 306 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+545 models: 240 validated on CPU by the maintainers, 305 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -692,13 +692,13 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `dots-tts-soar-audiocpp` (dots.tts SOAR) | - | accuracy | - | 3.0 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
 | `irodori-tts-audiocpp` (Irodori-TTS) | ja | accuracy | - | 1.4 GB | MIT · runs on audio.cpp · GPU recommended | untested |
 | `miotts-1.7b-audiocpp` (MioTTS 1.7B) | en, ja | accuracy | - | 2.2 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
-| `gradium-phonon-31m-audiocpp` (Gradium Phonon 31M) | en | balanced | - | 85 MB | Apache-2.0 · runs on audio.cpp | untested |
-| `gradium-phonon-40m-multilingual-audiocpp` (Gradium Phonon 40M) | en, de, es, fr, pt | balanced | - | 122 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
-| `gradium-phonon-40m-en-audiocpp` (Gradium Phonon 40M) | en | balanced | - | 122 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
-| `gradium-phonon-40m-fr-audiocpp` (Gradium Phonon 40M) | fr | balanced | - | 122 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
-| `gradium-phonon-40m-de-audiocpp` (Gradium Phonon 40M) | de | balanced | - | 122 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
-| `gradium-phonon-40m-es-audiocpp` (Gradium Phonon 40M) | es | balanced | - | 122 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
-| `gradium-phonon-40m-pt-audiocpp` (Gradium Phonon 40M) | pt | balanced | - | 122 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
+| `gradium-phonon-31m-audiocpp` (Gradium Phonon 31M) | en | balanced | - | 95 MB | Apache-2.0 · runs on audio.cpp | **CPU** · RTF 0.952 · round-trip WER 0.0% |
+| `gradium-phonon-40m-multilingual-audiocpp` (Gradium Phonon 40M) | en, de, es, fr, pt | balanced | - | 148 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
+| `gradium-phonon-40m-en-audiocpp` (Gradium Phonon 40M) | en | balanced | - | 132 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
+| `gradium-phonon-40m-fr-audiocpp` (Gradium Phonon 40M) | fr | balanced | - | 126 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
+| `gradium-phonon-40m-de-audiocpp` (Gradium Phonon 40M) | de | balanced | - | 125 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
+| `gradium-phonon-40m-es-audiocpp` (Gradium Phonon 40M) | es | balanced | - | 128 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
+| `gradium-phonon-40m-pt-audiocpp` (Gradium Phonon 40M) | pt | balanced | - | 125 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
 | `audio8-tts-0.6b-audiocpp` (Audio8 TTS Preview 0.6B) | en, de, es, fr, it, ja +5 | accuracy | - | 1.4 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
 | `confucius4-tts-audiocpp` (Confucius4-TTS) | en, de, es, fr, id, it +8 | accuracy | - | 8.2 GB | Apache-2.0 · runs on audio.cpp · GPU required | untested |
 | `plapre-3-audiocpp` (Plapre 3 (Danish)) | da | accuracy | - | 1.1 GB | CC-BY-4.0 · runs on audio.cpp · GPU recommended | **CPU** · RTF 3.487 · first audio 29568 ms · cloned voice: speaker similarity 0.50 |
@@ -3077,8 +3077,11 @@ then bolo needs a token (`hf_token`). audio.cpp v0.9.4's `gradium_phonon` family
 loading the way the 31M one does (nine layers instead of six) from the published safetensors, config.json and
 tokenizer.model, which is what the entries pull; files, sizes and revisions were checked against Hugging Face's
 listing, but the download needs that access, which the machine that runs bolo's checks does not have. The 102 voices of
-`gradium/phonon-voices` (Apache-2.0) work with every Phonon checkpoint and are not packaged yet: each entry has the
-checkpoint's default voice.
+`gradium/phonon-voices` (Apache-2.0) work with every Phonon checkpoint, and each Phonon entry carries those of its
+languages (the 31M and the English 40M the 37 English ones, the multilingual 40M all 102) next to the checkpoint's
+default voice: bolo puts each voice's file in the model's `embeddings/` folder, where audio.cpp finds it by name. On
+the 31M (2026-11-21, audio.cpp v0.9.4 built here) the default voice and four packaged ones, Zoey, Easton, Maeve and the
+character Captain Silas Blackwater, came back word for word from faster-whisper-small, each in its own voice.
 
 **Added, not yet run, on audio.cpp** (`options.not_yet_run: true`): Cilla Mini (`cilla-mini-audiocpp`, Persian, about 113 MB, 18.2 M parameters, audio.cpp's pocket_tts_small family),
 from Oncilla AI. CC BY-NC 4.0 (commercial use needs a paid plan from Oncilla AI) and gated behind a terms form, so it

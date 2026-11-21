@@ -141,6 +141,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   safetensors; added, not yet run (the download needs the terms accepted on Hugging Face).
 - **Cilla Mini** (`cilla-mini-audiocpp`, Persian, CC BY-NC 4.0, gated): on audio.cpp from its published
   safetensors; added, not yet run (the download needs the terms accepted on Hugging Face).
+- **Gradium Phonon's 102 voices** (gradium/phonon-voices, Apache-2.0) on the Phonon entries, by language: 37 English
+  voices on Phonon 31M and 40M English, all 102 on the multilingual 40M, the French, German, Spanish and Portuguese ones
+  on theirs. Checked on Phonon 31M on audio.cpp: each voice speaks in its own voice, read back word for word.
 - **eSpeak NG can write tied phonemes** (`a^ɪ`) for front ends that need them (`Phonemizer.phonemize(..., tie="^")`).
 
 ### Changed
