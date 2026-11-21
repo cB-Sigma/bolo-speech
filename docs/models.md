@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-515 models: 225 validated on CPU by the maintainers, 290 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+521 models: 225 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -151,19 +151,19 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `whisper-distil-small.en` | en | balanced | pseudo | 299 MB | MIT | **CPU** · RTF 0.131 · WER 3.1% |
 | `whisper-distil-medium.en` | en | balanced | pseudo | 573 MB | MIT | untested |
 | `whisper-distil-large-v2` | en | accuracy | pseudo | 983 MB | MIT | untested |
-| `whispercpp-tiny` | en, zh, de, es, ru, ko +94 | realtime | pseudo | 78 MB | MIT | untested |
+| `whispercpp-tiny` | en, zh, de, es, ru, ko +94 | realtime | pseudo | 78 MB | MIT | ran once here (shared CPU), not measured |
 | `whispercpp-tiny-q5_1` | en, zh, de, es, ru, ko +94 | realtime | pseudo | 32 MB | MIT | untested |
 | `whispercpp-tiny-q8_0` | en, zh, de, es, ru, ko +94 | realtime | pseudo | 44 MB | MIT | untested |
 | `whispercpp-tiny.en` | en | realtime | pseudo | 78 MB | MIT | untested |
 | `whispercpp-tiny.en-q5_1` | en | realtime | pseudo | 32 MB | MIT | untested |
 | `whispercpp-tiny.en-q8_0` | en | realtime | pseudo | 44 MB | MIT | untested |
-| `whispercpp-base` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 148 MB | MIT | untested |
+| `whispercpp-base` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 148 MB | MIT | ran once here (shared CPU), not measured |
 | `whispercpp-base-q5_1` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 60 MB | MIT | untested |
 | `whispercpp-base-q8_0` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 82 MB | MIT | untested |
 | `whispercpp-base.en` | en | balanced | pseudo | 148 MB | MIT | untested |
 | `whispercpp-base.en-q5_1` | en | balanced | pseudo | 60 MB | MIT | untested |
 | `whispercpp-base.en-q8_0` | en | balanced | pseudo | 82 MB | MIT | untested |
-| `whispercpp-small` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 488 MB | MIT | untested |
+| `whispercpp-small` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 488 MB | MIT | ran once here (shared CPU), not measured |
 | `whispercpp-small-q5_1` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 190 MB | MIT | untested |
 | `whispercpp-small-q8_0` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 264 MB | MIT | untested |
 | `whispercpp-small.en` | en | balanced | pseudo | 488 MB | MIT | untested |
@@ -177,8 +177,8 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `whispercpp-medium.en-q8_0` | en | accuracy | pseudo | 823 MB | MIT | untested |
 | `whispercpp-large-v3` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 3.1 GB | MIT | untested |
 | `whispercpp-large-v3-q5_0` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 1.1 GB | MIT | untested |
-| `whispercpp-large-v3-turbo` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 1.6 GB | MIT | untested |
-| `whispercpp-large-v3-turbo-q5_0` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 574 MB | MIT | untested |
+| `whispercpp-large-v3-turbo` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 1.6 GB | MIT | ran once here (shared CPU), not measured |
+| `whispercpp-large-v3-turbo-q5_0` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 574 MB | MIT | ran once here (shared CPU), not measured |
 | `whispercpp-large-v3-turbo-q8_0` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 874 MB | MIT | untested |
 
 #### Parakeet
@@ -566,10 +566,10 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `pocket-tts-pt-llamacpp` (Kyutai Pocket TTS (Portuguese)) | pt | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | **CPU** · RTF 0.631 · first audio 2262 ms · round-trip WER 41.7% · cloned voice: speaker similarity 0.32 |
 | `lfm3-audio-2b-llamacpp` (LFM3-Audio 2B) | en, ar, da, de, el, es +12 | accuracy | - | 1.4 GB | LFM Open License v1.0 ⚠ · runs on llama-server · GPU recommended | untested |
 | `soprano-1.1-80m-llamacpp` (Soprano 1.1 80M) | en | balanced | - | 146 MB | Apache-2.0 · runs on llama-server | **CPU** · RTF 1.239 · first audio 6024 ms · round-trip WER 0.0% |
-| `tiny-voca-llamacpp` (tiny-voca) | en | realtime | - | 26 MB | Apache-2.0 · runs on llama-server | untested |
-| `kokoro-82m-llamacpp` (Kokoro (llama.cpp)) | en | balanced | - | 270 MB | Apache-2.0 · runs on llama-server | untested |
-| `zonos3-mini-llamacpp` (ZONOS3-Mini (llama.cpp)) | en, de, es, fr, hi, it +5 | accuracy | - | 2.0 GB | Apache-2.0 · runs on llama-server · GPU recommended | untested |
-| `fish-audio-s2-pro-llamacpp` (Fish Audio S2 Pro (llama.cpp)) | - | accuracy | - | 6.3 GB | Fish Audio Research License ⚠ · runs on llama-server · GPU recommended | untested |
+| `tiny-voca-llamacpp` (tiny-voca) | en | realtime | - | 26 MB | Apache-2.0 · runs on llama-server | ran once here (shared CPU), not measured |
+| `kokoro-82m-llamacpp` (Kokoro (llama.cpp)) | en | balanced | - | 270 MB | Apache-2.0 · runs on llama-server | ran once here (shared CPU), not measured |
+| `zonos3-mini-llamacpp` (ZONOS3-Mini (llama.cpp)) | en, de, es, fr, hi, it +5 | accuracy | - | 2.0 GB | Apache-2.0 · runs on llama-server · GPU recommended | ran once here (shared CPU), not measured |
+| `fish-audio-s2-pro-llamacpp` (Fish Audio S2 Pro (llama.cpp)) | - | accuracy | - | 6.3 GB | Fish Audio Research License ⚠ · runs on llama-server · GPU recommended | ran once here (shared CPU), not measured |
 | `fish-drama-3-llamacpp` (Fish Audio Drama 3) | - | accuracy | - | 23.5 GB | Fish Audio Community License 1.0 ⚠ · runs on llama-server · GPU required | untested |
 
 #### External TTS server: audio.cpp
@@ -577,7 +577,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `chatterbox-multilingual-audiocpp` (Chatterbox Multilingual (V3 talker)) | en, ar, da, de, el, es +13 | accuracy | - | 2.1 GB | MIT · runs on audio.cpp · GPU recommended | untested |
-| `chatterbox-turbo-audiocpp` (Chatterbox Turbo) | en | accuracy | - | 699 MB | MIT · runs on audio.cpp · GPU recommended | untested |
+| `chatterbox-turbo-audiocpp` (Chatterbox Turbo) | en | accuracy | - | 699 MB | MIT · runs on audio.cpp · GPU recommended | ran once here (shared CPU), not measured |
 | `cosyvoice3-0.5b-audiocpp` (Fun-CosyVoice3 0.5B) | en, de, es, fr, it, ja +4 | accuracy | - | 2.3 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
 | `voxcpm2-audiocpp` (VoxCPM2 2B) | en, ar, da, de, el, es +24 | accuracy | - | 3.0 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
 | `magpie-tts-multilingual-357m-audiocpp` (NVIDIA Magpie TTS Multilingual 357M) | en, ar, de, es, fr, hi +5 | accuracy | - | 1.6 GB | NVIDIA Open Model License · runs on audio.cpp · GPU recommended | untested |
@@ -610,6 +610,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `irodori-tts-audiocpp` (Irodori-TTS) | ja | accuracy | - | 1.4 GB | MIT · runs on audio.cpp · GPU recommended | untested |
 | `miotts-1.7b-audiocpp` (MioTTS 1.7B) | en, ja | accuracy | - | 2.2 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
 | `gradium-phonon-31m-audiocpp` (Gradium Phonon 31M) | en | balanced | - | 85 MB | Apache-2.0 · runs on audio.cpp | untested |
+| `gradium-phonon-40m-multilingual-audiocpp` (Gradium Phonon 40M) | en, de, es, fr, pt | balanced | - | 122 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
+| `gradium-phonon-40m-en-audiocpp` (Gradium Phonon 40M) | en | balanced | - | 122 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
+| `gradium-phonon-40m-fr-audiocpp` (Gradium Phonon 40M) | fr | balanced | - | 122 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
+| `gradium-phonon-40m-de-audiocpp` (Gradium Phonon 40M) | de | balanced | - | 122 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
+| `gradium-phonon-40m-es-audiocpp` (Gradium Phonon 40M) | es | balanced | - | 122 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
+| `gradium-phonon-40m-pt-audiocpp` (Gradium Phonon 40M) | pt | balanced | - | 122 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
 | `audio8-tts-0.6b-audiocpp` (Audio8 TTS Preview 0.6B) | en, de, es, fr, it, ja +5 | accuracy | - | 1.4 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
 | `confucius4-tts-audiocpp` (Confucius4-TTS) | en, de, es, fr, id, it +8 | accuracy | - | 8.2 GB | Apache-2.0 · runs on audio.cpp · GPU required | untested |
 | `plapre-3-audiocpp` (Plapre 3 (Danish)) | da | accuracy | - | 1.1 GB | CC-BY-4.0 · runs on audio.cpp · GPU recommended | **CPU** · RTF 3.487 · first audio 29568 ms · cloned voice: speaker similarity 0.50 |
@@ -2922,6 +2928,17 @@ speech-to-text and audio-in models on llama-server (Voxtral, LFM2.5-Audio).
 Face, voices and options from llama.cpp's docs/multimodal/tts.md, architectures supported by the pinned b12521):
 `zonos3-mini-llamacpp` (ZONOS3-Mini, Apache-2.0, 27 voices of the release, 2.0 GB) and `fish-audio-s2-pro-llamacpp`
 (Fish Audio S2 Pro, Fish Audio Research License: not for commercial use, 6.3 GB).
+
+**Added, not yet run, on audio.cpp** (`options.not_yet_run: true`): Gradium Phonon 40M, the multilingual checkpoint
+(`gradium-phonon-40m-multilingual-audiocpp`: English, French, German, Spanish and Portuguese in one set of weights)
+and the one-language ones (`gradium-phonon-40m-en-audiocpp`, `-fr-`, `-de-`, `-es-`, `-pt-`), each about 122 MB.
+CC BY-NC 4.0, not for commercial use, and gated: Gradium grants access automatically after a form on Hugging Face,
+then bolo needs a token (`hf_token`). audio.cpp v0.9.4's `gradium_phonon` family documents these checkpoints as
+loading the way the 31M one does (nine layers instead of six) from the published safetensors, config.json and
+tokenizer.model, which is what the entries pull; files, sizes and revisions were checked against Hugging Face's
+listing, but the download needs that access, which the machine that runs bolo's checks does not have. The 102 voices of
+`gradium/phonon-voices` (Apache-2.0) work with every Phonon checkpoint and are not packaged yet: each entry has the
+checkpoint's default voice.
 
 **tiny-voca in process** (`tiny-voca-onnx`): the authors' ONNX export on ONNX Runtime, no server, with their
 phonemiser dizione (Apache-2.0; bolo carries a copy in `bolo/vendor/dizione`, its data comes with the model). One

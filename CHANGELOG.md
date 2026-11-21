@@ -6,6 +6,14 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added
+
+- **Gradium Phonon 40M on audio.cpp**: the multilingual checkpoint (`gradium-phonon-40m-multilingual-audiocpp`,
+  English, French, German, Spanish and Portuguese in one set of weights) and the English, French, German, Spanish
+  and Portuguese ones (`gradium-phonon-40m-<lang>-audiocpp`), about 122 MB each, with the checkpoint's default voice.
+  CC BY-NC 4.0 (not for commercial use) and gated: accept Gradium's access form on Hugging Face and set `hf_token`.
+  Catalogued as added, not yet run: the download needs that access.
+
 ## [1.0.0] - 2026-11-19
 
 The first stable release.

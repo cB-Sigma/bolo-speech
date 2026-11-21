@@ -242,7 +242,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TTS | Orpheus family on llama.cpp (SNAC in onnxruntime) | 6 | as, bho, bn, brx, doi, en, gu, hi +11 | 0 | - |
 | TTS | Piper | 85 | ar, bn, ca, cs, cy, da, de, el +35 | 28 | 0.040 (`piper-ne-np-google-medium`) |
 | TTS | External TTS server: llama-server | 16 | ar, da, de, el, en, es, fi, fr +16 | 9 | 0.397 (`pocket-tts-it-llamacpp`) |
-| TTS | External TTS server: audio.cpp | 40 | ar, be, bg, bn, cs, da, de, el +41 | 6 | 1.051 (`moss-tts-nano-100m-audiocpp`) |
+| TTS | External TTS server: audio.cpp | 46 | ar, be, bg, bn, cs, da, de, el +41 | 6 | 1.051 (`moss-tts-nano-100m-audiocpp`) |
 | TTS | External TTS server: tontaube | 2 | de, en, es, fr, it, nl, pt | 0 | - |
 | TTS | KittenTTS | 4 | en | 4 | 0.107 (`kitten-nano-0.8`) |
 | TTS | Matcha-TTS | 2 | en, zh | 1 | 0.205 (`matcha-en-ljspeech`) |
@@ -270,7 +270,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | WATERMARK | Perth | 1 | - | 1 | 0.033 (`perth-onnx`) |
 | WATERMARK | WavMark | 1 | - | 1 | 2.300 (`wavmark-onnx`) |
 
-**515 models in the catalog, 225 validated on CPU, 290 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**521 models in the catalog, 225 validated on CPU, 296 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

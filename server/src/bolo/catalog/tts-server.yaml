@@ -2127,7 +2127,7 @@
   features: []
   description: 'Gradium Phonon 31M on audio.cpp (gradium_phonon, experimental there). Languages: en. Both packages come
     from Gradium''s repositories: the Q8_0 GGUF and the published safetensors checkpoint, each with its default voice. The
-    40m checkpoints (gradium/phonon-40m-en and other languages) are CC-BY-NC-4.0 and gated, and are not packaged. Runs in
+    40m checkpoints (gradium/phonon-40m-en and other languages, CC-BY-NC-4.0 and gated) are the gradium-phonon-40m entries. Runs in
     an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU optional,
     about 0.6 GB. audio.cpp also streams this family (stream: true in the catalog options, served with mode streaming).'
   source_url: https://huggingface.co/gradium/phonon-31m-en
@@ -2144,6 +2144,222 @@
     cloning: false
     send_language: false
     hardware: {gpu: optional, vram_gb: 0.6, note: small enough for a CPU}
+- id: gradium-phonon-40m-multilingual-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Gradium Phonon 40M
+  languages: [en, de, es, fr, pt]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 122039513
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/gradium/phonon-40m-multilingual
+  commercial_use: false
+  gated: true
+  features: []
+  description: 'Gradium Phonon 40M, English, French, German, Spanish and Portuguese in one set of weights, on audio.cpp (gradium_phonon, experimental there): the published
+    safetensors checkpoint with its default voice, which audio.cpp loads as it loads the 31M one (nine layers instead of
+    six). CC BY-NC 4.0: not for commercial use. Gated: accept Gradium''s access form on Hugging Face (granted
+    automatically) and give bolo a token (hf_token). audio.cpp does no text normalisation: write numbers and symbols out
+    in words. The 102 voices of gradium/phonon-voices work with every Phonon checkpoint but are not packaged here. Runs
+    in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU
+    optional, about 0.7 GB.'
+  source_url: https://huggingface.co/gradium/phonon-40m-multilingual
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: gradium/phonon-40m-multilingual
+    revision: 1537ce46c64f42903e0d608b132ccb073dac46d2
+    include: [model.safetensors, config.json, tokenizer.model, default-voice.safetensors]
+  options:
+    runtime: audio.cpp
+    family: gradium_phonon
+    server_model: gradium-phonon-40m-multilingual-audiocpp
+    cloning: false
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.7, note: small enough for a CPU}
+    not_yet_run: true
+- id: gradium-phonon-40m-en-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Gradium Phonon 40M
+  languages: [en]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 122039215
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/gradium/phonon-40m-en
+  commercial_use: false
+  gated: true
+  features: []
+  description: 'Gradium Phonon 40M, English, on audio.cpp (gradium_phonon, experimental there): the published
+    safetensors checkpoint with its default voice, which audio.cpp loads as it loads the 31M one (nine layers instead of
+    six). CC BY-NC 4.0: not for commercial use. Gated: accept Gradium''s access form on Hugging Face (granted
+    automatically) and give bolo a token (hf_token). audio.cpp does no text normalisation: write numbers and symbols out
+    in words. The 102 voices of gradium/phonon-voices work with every Phonon checkpoint but are not packaged here. Runs
+    in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU
+    optional, about 0.7 GB.'
+  source_url: https://huggingface.co/gradium/phonon-40m-en
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: gradium/phonon-40m-en
+    revision: bc7e8ae7e543a7a3e4604753e42fbda76ddf0781
+    include: [model.safetensors, config.json, tokenizer.model, default-voice.safetensors]
+  options:
+    runtime: audio.cpp
+    family: gradium_phonon
+    server_model: gradium-phonon-40m-en-audiocpp
+    cloning: false
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.7, note: small enough for a CPU}
+    not_yet_run: true
+- id: gradium-phonon-40m-fr-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Gradium Phonon 40M
+  languages: [fr]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 122039473
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/gradium/phonon-40m-fr
+  commercial_use: false
+  gated: true
+  features: []
+  description: 'Gradium Phonon 40M, French, on audio.cpp (gradium_phonon, experimental there): the published
+    safetensors checkpoint with its default voice, which audio.cpp loads as it loads the 31M one (nine layers instead of
+    six). CC BY-NC 4.0: not for commercial use. Gated: accept Gradium''s access form on Hugging Face (granted
+    automatically) and give bolo a token (hf_token). audio.cpp does no text normalisation: write numbers and symbols out
+    in words. The 102 voices of gradium/phonon-voices work with every Phonon checkpoint but are not packaged here. Runs
+    in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU
+    optional, about 0.7 GB.'
+  source_url: https://huggingface.co/gradium/phonon-40m-fr
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: gradium/phonon-40m-fr
+    revision: d91086970206b88efd2c88ca971d0628b5968f0f
+    include: [model.safetensors, config.json, tokenizer.model, default-voice.safetensors]
+  options:
+    runtime: audio.cpp
+    family: gradium_phonon
+    server_model: gradium-phonon-40m-fr-audiocpp
+    cloning: false
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.7, note: small enough for a CPU}
+    not_yet_run: true
+- id: gradium-phonon-40m-de-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Gradium Phonon 40M
+  languages: [de]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 122039543
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/gradium/phonon-40m-de
+  commercial_use: false
+  gated: true
+  features: []
+  description: 'Gradium Phonon 40M, German, on audio.cpp (gradium_phonon, experimental there): the published
+    safetensors checkpoint with its default voice, which audio.cpp loads as it loads the 31M one (nine layers instead of
+    six). CC BY-NC 4.0: not for commercial use. Gated: accept Gradium''s access form on Hugging Face (granted
+    automatically) and give bolo a token (hf_token). audio.cpp does no text normalisation: write numbers and symbols out
+    in words. The 102 voices of gradium/phonon-voices work with every Phonon checkpoint but are not packaged here. Runs
+    in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU
+    optional, about 0.7 GB.'
+  source_url: https://huggingface.co/gradium/phonon-40m-de
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: gradium/phonon-40m-de
+    revision: 79cfc7b47fcfc0b666657b981eb366415023a862
+    include: [model.safetensors, config.json, tokenizer.model, default-voice.safetensors]
+  options:
+    runtime: audio.cpp
+    family: gradium_phonon
+    server_model: gradium-phonon-40m-de-audiocpp
+    cloning: false
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.7, note: small enough for a CPU}
+    not_yet_run: true
+- id: gradium-phonon-40m-es-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Gradium Phonon 40M
+  languages: [es]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 122040285
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/gradium/phonon-40m-es
+  commercial_use: false
+  gated: true
+  features: []
+  description: 'Gradium Phonon 40M, Spanish, on audio.cpp (gradium_phonon, experimental there): the published
+    safetensors checkpoint with its default voice, which audio.cpp loads as it loads the 31M one (nine layers instead of
+    six). CC BY-NC 4.0: not for commercial use. Gated: accept Gradium''s access form on Hugging Face (granted
+    automatically) and give bolo a token (hf_token). audio.cpp does no text normalisation: write numbers and symbols out
+    in words. The 102 voices of gradium/phonon-voices work with every Phonon checkpoint but are not packaged here. Runs
+    in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU
+    optional, about 0.7 GB.'
+  source_url: https://huggingface.co/gradium/phonon-40m-es
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: gradium/phonon-40m-es
+    revision: e5e052b26e31abd5918ade71d3135e69d51a66f8
+    include: [model.safetensors, config.json, tokenizer.model, default-voice.safetensors]
+  options:
+    runtime: audio.cpp
+    family: gradium_phonon
+    server_model: gradium-phonon-40m-es-audiocpp
+    cloning: false
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.7, note: small enough for a CPU}
+    not_yet_run: true
+- id: gradium-phonon-40m-pt-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Gradium Phonon 40M
+  languages: [pt]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 122040445
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/gradium/phonon-40m-pt
+  commercial_use: false
+  gated: true
+  features: []
+  description: 'Gradium Phonon 40M, Portuguese, on audio.cpp (gradium_phonon, experimental there): the published
+    safetensors checkpoint with its default voice, which audio.cpp loads as it loads the 31M one (nine layers instead of
+    six). CC BY-NC 4.0: not for commercial use. Gated: accept Gradium''s access form on Hugging Face (granted
+    automatically) and give bolo a token (hf_token). audio.cpp does no text normalisation: write numbers and symbols out
+    in words. The 102 voices of gradium/phonon-voices work with every Phonon checkpoint but are not packaged here. Runs
+    in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU
+    optional, about 0.7 GB.'
+  source_url: https://huggingface.co/gradium/phonon-40m-pt
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: gradium/phonon-40m-pt
+    revision: 4cbfd742a1555d60eb5399c6d296e9f2e07389e9
+    include: [model.safetensors, config.json, tokenizer.model, default-voice.safetensors]
+  options:
+    runtime: audio.cpp
+    family: gradium_phonon
+    server_model: gradium-phonon-40m-pt-audiocpp
+    cloning: false
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.7, note: small enough for a CPU}
+    not_yet_run: true
 - id: audio8-tts-0.6b-audiocpp
   task: tts
   engine: tts-server
