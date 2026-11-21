@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-548 models: 245 validated on CPU by the maintainers, 303 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+548 models: 245 validated on CPU by the maintainers, 303 untested. 34 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -1252,6 +1252,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `emotion2vec-plus-large` | - | accuracy | - | 649 MB | FunASR Model License 1.1 (custom) | **CPU** · RTF 0.845 |
 
 ### Decisions (typed questions about a recording or a text)
+
+#### Gemini Decision (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `gemini-decision-1` | en | realtime | - | none (cloud API) | Gemini API Additional Terms of Service (paid cloud API) · [terms](https://ai.google.dev/gemini-api/terms) · needs provider `gemini` (key: `BOLO_PROVIDER_GEMINI_API_KEY`) | untested |
 
 #### d1-omni
 

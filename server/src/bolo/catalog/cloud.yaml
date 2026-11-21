@@ -3325,3 +3325,31 @@
     model: amazon.nova-2-5-sonic
     dialect: nova-sonic
     default_voice: matthew
+# Google's Gemini Decisions API (provider kind gemini, bolo.remote.gemini), read 2026-11-21 from the Gemini API's
+# Decisions guide and the getting-started codelab; not run against a real account.
+- id: gemini-decision-1
+  task: decision
+  engine: remote
+  kind: remote-decision
+  family: Gemini Decision (cloud)
+  languages: [en]
+  tier: realtime
+  streaming: false
+  sample_rate: 16000
+  license: Gemini API Additional Terms of Service (paid cloud API)
+  license_url: https://ai.google.dev/gemini-api/terms
+  cloud: true
+  features: [audio-in]
+  description: 'Google''s Gemini Decision 1 (the Gemini Decisions API, released 2026-11-11): yes/no, choice and score
+    questions about a text and a recording in one pass, with calibrated probabilities and no generated text; up to
+    1,000 questions and 262,144 tokens of input per request, billed by input tokens only (USD 0.10 per million when
+    read). bolo sends the recording as a 16 kHz WAV. Key: BOLO_PROVIDER_GEMINI_API_KEY (a Google AI Studio key).
+    Added, not yet run against a real account. Paid cloud API: the audio leaves this server.'
+  source_url: https://ai.google.dev/gemini-api/docs/decisions
+  validated: untested
+  options:
+    provider: gemini
+    provider_kind: gemini
+    model: gemini-decision-1
+    max_audio_s: 600.0
+    not_yet_run: true

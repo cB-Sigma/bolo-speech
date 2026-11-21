@@ -37,6 +37,8 @@ import numpy as np
 
 from bolo.audio.encode import encode_audio
 from bolo.engines.base import (
+    DecisionModel,
+    DecisionRequest,
     DenoiseModel,
     Engine,
     EngineStatus,
@@ -460,12 +462,51 @@ class RemoteDenoise(DenoiseModel):
         return np.ascontiguousarray(out[: len(samples)], dtype=np.float32)
 
 
+class RemoteDecision(DecisionModel):
+    """A decision model at a provider (Google's Gemini Decisions API): the text and the recording (a 16 kHz WAV)
+    and the questions in one request; the answers in ``/v1/systemone``'s shape (bolo.decide words them)."""
+
+    def __init__(self, registry: ProviderRegistry, adapter: Adapter, name: str, spec: dict[str, Any]) -> None:
+        self.registry = registry
+        self.adapter = adapter
+        self.name = name
+        self.max_audio_s = float(spec.get("max_audio_s") or 600.0)
+
+    @property
+    def provider(self) -> ProviderConfig:
+        return self.adapter.provider
+
+    def close(self) -> None:
+        self.adapter.close()
+
+    def decide(self, request: DecisionRequest) -> dict[str, Any]:
+        from bolo.engines.voxtral_llamacpp import wav_bytes
+
+        decide = getattr(self.adapter, "decide", None)
+        if decide is None:
+            raise EngineUnavailable(f"{self.adapter.where} has no decision API")
+        usage = self.adapter.new_usage()
+        wav = None
+        if request.samples is not None:
+            usage.audio_seconds = len(request.samples) / 16000
+            wav = wav_bytes(request.samples)
+        try:
+            out: dict[str, Any] = decide(request.text, wav, request.questions, usage)
+        except BoloError as exc:
+            self.registry.record(usage, error=exc.message)
+            raise
+        tokens = int(out.get("usage", {}).get("input_tokens") or 0)
+        usage.cost = self.provider.estimate(self.adapter.model, requests=usage.requests, tokens=tokens)
+        self.registry.record(usage)
+        return out
+
+
 class RemoteEngine(Engine):
     id = ENGINE_ID
     name = "Cloud speech APIs (OpenAI-compatible, Sarvam, ElevenLabs, Deepgram, Soniox, AssemblyAI, xAI, Rime)"
     license = "Apache-2.0 (bolo's client); each provider's terms apply to its API"
     url = "https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md"
-    kinds = ("remote-stt", "remote-tts", "remote-denoise")
+    kinds = ("remote-stt", "remote-tts", "remote-denoise", "remote-decision")
 
     def __init__(self) -> None:
         self.settings: Settings | None = None
@@ -499,9 +540,9 @@ class RemoteEngine(Engine):
                 f'speech-to-speech pipeline (set s2s_model = "{name}" and realtime_pipeline = "speech-to-speech"); '
                 'docs/providers.md, "Cloud speech-to-speech"'
             )
-        if task not in ("stt", "tts", "denoise"):
+        if task not in ("stt", "tts", "denoise", "decision"):
             raise EngineUnavailable(
-                f"the remote engine serves speech-to-text, text-to-speech and denoising, not {task!r}"
+                f"the remote engine serves speech-to-text, text-to-speech, denoising and decisions, not {task!r}"
             )
         provider = registry.require(
             str(spec.get("provider") or "") or None, str(spec.get("provider_kind") or "") or None, model=name
@@ -515,6 +556,8 @@ class RemoteEngine(Engine):
             return RemoteSTT(registry, adapter, name, spec)
         if task == "denoise":
             return RemoteDenoise(registry, adapter, name, spec)
+        if task == "decision":
+            return RemoteDecision(registry, adapter, name, spec)
         model = RemoteTTS(registry, adapter, name, spec)
         model.connect()
         return model

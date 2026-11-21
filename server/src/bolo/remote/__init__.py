@@ -19,6 +19,7 @@ ADAPTERS: dict[str, str] = {
     "rime": "bolo.remote.realtime_only:RimePrism",
     "azure-mai": "bolo.remote.azure_mai:AzureMAI",
     "bedrock": "bolo.remote.realtime_only:Bedrock",
+    "gemini": "bolo.remote.gemini:Gemini",
 }
 
 

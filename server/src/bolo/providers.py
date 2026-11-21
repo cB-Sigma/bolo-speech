@@ -36,6 +36,7 @@ log = logging.getLogger("bolo.providers")
 
 KINDS = (
     "openai-compatible", "sarvam", "elevenlabs", "deepgram", "soniox", "assemblyai", "xai", "rime", "azure-mai", "bedrock",
+    "gemini",
 )  # fmt: skip
 DEFAULT_BASE_URLS = {
     "openai-compatible": "https://api.openai.com/v1",
@@ -51,6 +52,8 @@ DEFAULT_BASE_URLS = {
     "azure-mai": "https://your-resource.services.ai.azure.com",
     # Amazon Bedrock's runtime in a Region (the option region picks another; Nova Sonic only, bolo.duplex.nova_sonic)
     "bedrock": "https://bedrock-runtime.us-east-1.amazonaws.com",
+    # Google's Gemini API (the Decisions API's gemini-decision-1; bolo.remote.gemini)
+    "gemini": "https://generativelanguage.googleapis.com/v1beta",
 }
 #: kinds whose default base_url is a placeholder for the operator's own resource
 NEEDS_BASE_URL = ("azure-mai",)
@@ -66,6 +69,7 @@ KIND_BY_NAME = {
     "rime": "rime",
     "azure-mai": "azure-mai",
     "bedrock": "bedrock",
+    "gemini": "gemini",
 }
 TERMS = {
     "openai-compatible": "https://openai.com/policies/services-agreement/",
@@ -78,12 +82,13 @@ TERMS = {
     "rime": "https://www.rime.ai/terms",
     "azure-mai": "https://azure.microsoft.com/support/legal/preview-supplemental-terms/",
     "bedrock": "https://aws.amazon.com/service-terms/",
+    "gemini": "https://ai.google.dev/gemini-api/terms",
 }
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
 _SECRET_RE = re.compile(r"key|token|secret|password|authorization", re.IGNORECASE)
 #: price units: what one unit of each is measured in
-PRICE_UNITS = ("per_minute", "per_hour", "per_1k_chars", "per_1m_chars", "per_request")
+PRICE_UNITS = ("per_minute", "per_hour", "per_1k_chars", "per_1m_chars", "per_request", "per_1m_tokens")
 
 
 def key_env(name: str) -> str:
@@ -210,7 +215,7 @@ class ProviderConfig:
         return dict(price) if isinstance(price, dict) else None
 
     def estimate(
-        self, model: str, *, audio_seconds: float = 0.0, chars: int = 0, requests: int = 1
+        self, model: str, *, audio_seconds: float = 0.0, chars: int = 0, requests: int = 1, tokens: int = 0
     ) -> dict[str, Any] | None:
         """``{"amount", "currency", "estimated": True}`` from the price table, or None without a price."""
         price = self.price_for(model)
@@ -222,6 +227,7 @@ class ProviderConfig:
             + float(price.get("per_1k_chars", 0.0)) * chars / 1000.0
             + float(price.get("per_1m_chars", 0.0)) * chars / 1_000_000.0
             + float(price.get("per_request", 0.0)) * requests
+            + float(price.get("per_1m_tokens", 0.0)) * tokens / 1_000_000.0
         )
         return {"amount": round(amount, 8), "currency": str(price.get("currency") or "USD"), "estimated": True}
 

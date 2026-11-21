@@ -46,12 +46,13 @@ A provider has a name, a `kind`, a base URL, an API key, options and an optional
 | `xai` | xAI (speech-to-speech only: the Voice Agent API, `s2s_model`) | `https://api.x.ai/v1` (`wss://api.x.ai/v1/realtime`) | `Authorization: Bearer <key>` |
 | `rime` | Rime (speech-to-speech only: Prism, `s2s_model`) | `https://prism.api.rime.ai/v1` (`wss://prism.api.rime.ai/v1/realtime`) | `Authorization: Bearer <key>` |
 | `bedrock` | Amazon Bedrock (speech-to-speech only: Nova Sonic, `s2s_model`), through AWS's SDK | `https://bedrock-runtime.us-east-1.amazonaws.com` (option `region` for another) | SigV4, signed by AWS's SDK: the key is `<access key id>:<secret access key>[:<session token>]`, or none to use AWS's own variables |
+| `gemini` | Google's Gemini API: the Decisions API's `gemini-decision-1` (task `decision`, `POST /v1/audio/decisions`) | `https://generativelanguage.googleapis.com/v1beta` | `x-goog-api-key: <key>` (a Google AI Studio key) |
 
 In the configuration file, one table per provider:
 
 ```toml
 [providers.openai]                 # the names openai, sarvam, elevenlabs, deepgram, soniox, assemblyai,
-                                   # azure-mai, xai, rime and bedrock imply their kind
+                                   # azure-mai, xai, rime, bedrock and gemini imply their kind
 api_key = "…"
 
 [providers.sarvam]
@@ -151,7 +152,7 @@ soon as its provider is configured**, and `GET /v1/models` lists it from then on
 | `assemblyai-stt-3.7-realtime`, `assemblyai-stt-3.7-realtime-agent` | `assemblyai-stt-3-7-realtime`, `…-realtime-agent` | STT | live (AssemblyAI's Streaming API v3, with interim text and AssemblyAI's turn detection) with speaker labels on the socket; the `-agent` model is the one tuned for voice agents. Recorded audio and Realtime turns go to `assemblyai-stt-3-7` |
 
 An entry looks for a provider with the name in its `options.provider` (`openai`, `sarvam`,
-`elevenlabs`, `deepgram`, `soniox`, `assemblyai`, `azure-mai`, `xai`, `rime`, `bedrock`). If you called the account something else, the first configured
+`elevenlabs`, `deepgram`, `soniox`, `assemblyai`, `azure-mai`, `xai`, `rime`, `bedrock`, `gemini`). If you called the account something else, the first configured
 provider of the same kind at the vendor's own address is used.
 
 ### Any other model: `provider:model`
@@ -394,6 +395,24 @@ Both are public previews (Microsoft's preview terms are the licence link).
 - **MAI Realtime 1** (Microsoft's speech-to-speech model, announced 2026-11-17) is in limited-access
   preview and has no public API reference yet, so it has no catalog entry.
 
+### Gemini Decisions API
+
+`gemini-decision-1` answers typed questions (yes/no, a choice, a score) about a text and a recording in one pass, as
+the local decision models do (docs/api.md, "Decisions"). bolo sends `POST {base_url}/decisions` with the key in
+`x-goog-api-key`: `model`, `input` (a text block, and the recording as an audio block with a 16 kHz WAV inline) and
+`questions` in the shape of llama.cpp's `/v1/systemone` (a choice option without a description is described by its
+name). Google bills input tokens only (USD 0.10 per million when read); with `per_1m_tokens` in the provider's price
+table, bolo estimates each request's cost from the `usage.total_input_tokens` of the answer.
+
+```toml
+[providers.gemini]
+api_key = "..."                    # or BOLO_PROVIDER_GEMINI_API_KEY
+prices = { "gemini-decision-1" = { per_1m_tokens = 0.10 } }
+```
+
+Written from Google's documentation (the Decisions guide and the getting-started codelab, read 2026-11-21) and
+tested against a stand-in built from it; not run against a real account.
+
 ## Errors
 
 | The provider answered | bolo answers | `code` |
@@ -467,7 +486,8 @@ last_error}]`. `/metrics` has `bolo_provider_requests_total`, `bolo_provider_err
 
 **Cost is an estimate from your own price table**, never a bill. A price is a table of any of
 `per_minute`, `per_hour` (of audio: uploaded for speech-to-text, produced for text-to-speech),
-`per_1k_chars`, `per_1m_chars` (of text sent to a voice), `per_request`, and `currency` (default
+`per_1k_chars`, `per_1m_chars` (of text sent to a voice), `per_request`, `per_1m_tokens` (of input tokens, for
+token-priced APIs that say how many they read: Gemini's Decisions API), and `currency` (default
 `USD`), keyed by the provider's model name; `"*"` is the price of every other model. Without a
 price there is no `cost` field. Token-priced models (the `gpt-4o` family bills by tokens) can only
 be approximated by a per-minute or per-character price. `x-bolo-estimated-cost: 0.0061 USD` is
@@ -578,7 +598,7 @@ and OpenAI's Realtime *transcription* sessions as a live socket for the STT WebS
 | `GET /api/v1/providers/{name}` | one provider |
 | `PUT /api/v1/providers/{name}` `{kind?, base_url?, api_key?, clear_api_key?, options?, prices?}` | adds or changes a stored provider. `api_key` is write-only: absent or empty keeps the stored key, `clear_api_key: true` removes it. Loaded models of the provider are unloaded so the change takes effect. `400` for a provider that comes from the configuration, an unknown kind or field, or when editing is not allowed |
 | `DELETE /api/v1/providers/{name}` | `204`; `400` for a provider from the configuration |
-| `POST /api/v1/providers/{name}/test` | one cheap request with the stored key: `{name, ok, message, code, checked: "credentials"\|"reachability", latency_ms}`. `credentials`: the key was accepted (OpenAI-compatible: `GET /models`; ElevenLabs: `GET /v2/voices`; Deepgram: `GET /v1/projects`; Soniox: `GET /v1/models`). `reachability`: the address answered and did not refuse the key, but nothing proves the key (Sarvam documents no free read-only request; a refused key is still reported as a failure). AssemblyAI: `GET /v2/transcript?limit=1`; xAI: `GET /v1/tts/voices`; Rime and Azure MAI: the WebSocket handshake, closed right after `session.created`, before any configuration or audio (all `credentials`); Amazon Bedrock: that credentials are set and the Region's `bedrock-runtime` answers (`reachability`: requests are signed by AWS's SDK, and there is no free signed one) |
+| `POST /api/v1/providers/{name}/test` | one cheap request with the stored key: `{name, ok, message, code, checked: "credentials"\|"reachability", latency_ms}`. `credentials`: the key was accepted (OpenAI-compatible: `GET /models`; ElevenLabs: `GET /v2/voices`; Deepgram: `GET /v1/projects`; Soniox: `GET /v1/models`). `reachability`: the address answered and did not refuse the key, but nothing proves the key (Sarvam documents no free read-only request; a refused key is still reported as a failure). AssemblyAI: `GET /v2/transcript?limit=1`; xAI: `GET /v1/tts/voices`; Rime and Azure MAI: the WebSocket handshake, closed right after `session.created`, before any configuration or audio (all `credentials`); Amazon Bedrock: that credentials are set and the Region's `bedrock-runtime` answers (`reachability`: requests are signed by AWS's SDK, and there is no free signed one); Gemini: `GET /v1beta/models` (`credentials`) |
 
 Events: `provider` `{name, event: "saved"|"removed"}` on `GET /api/v1/events`.
 
@@ -598,6 +618,7 @@ Read on 2026-11-14:
 | Rime (read 2026-11-21) | `docs.rime.ai` (api-reference/prism/websocket, prism/migrate-from-openai) | the address, Bearer on the upgrade, no query, the strict session fields, 16 kHz in and 24 kHz out, `turn_detection: null`, `response.create` and `prism_cause` (typed turns, tool continuations, acknowledgement by `conversation.item.created`), the beta event names, `response.done` statuses, voices |
 | Microsoft MAI (read 2026-11-21) | `learn.microsoft.com/azure/ai-services/speech-service/` (mai-transcribe-2-streaming, mai-transcribe-2-streaming-realtime, mai-voices) | the socket's address, `api-key`, the transcription session, `append` / `commit`, `delta` / `intermediate` / `completed`, the 60 languages; the Speech route, SSML with the model suffix, the output format of Microsoft's example, the 97 voices and 23 languages, the regions |
 | Amazon (read 2026-11-21) | `docs.aws.amazon.com` (the Bedrock model card of Nova 2.5 Sonic; the API reference of `InvokeModelWithBidirectionalStream`; the Nova 2 user guide: getting started, input events, output events, barge-in, turn-taking, language support); the source of `aws-sdk-bedrock-runtime` 0.13.1 | the model id, Regions, quota, the 8-minute stream, every input and output event and its fields, `generationStage`, `stopReason` values, the voices by language; from the SDK: the async client, `AsyncBedrockRuntimeConfig.resolve` with credentials and the awscrt transport (the guide's sample is for an older SDK) |
+| Google (read 2026-11-21) | `ai.google.dev` (the Gemini API's Decisions guide), `codelabs.developers.google.com` (getting started with the Gemini Decisions API), the launch post on `blog.google` | the endpoint, the key header, `model`, `input` content blocks (text; audio with `data` or `uri` and `mime_type`), `questions` (types, `instructions`, `criteria`), the answers of each type, `usage`, the limits and the price |
 | Deepgram | `developers.deepgram.com` (reference: listen-pre-recorded, listen-streaming, manage/projects/list; the pre-recorded guide; models and languages overview) | routes, `Authorization: Token`, the raw-audio upload, query parameters, `keyterm` against `keywords`, the response paths, the live socket's parameters and messages, Nova-3 and Nova-2 language codes |
 
 Not verified, or taken from memory:

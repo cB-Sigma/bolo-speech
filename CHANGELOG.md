@@ -8,6 +8,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Google's Gemini Decision 1 as a cloud decision model** (`gemini-decision-1`, provider kind `gemini`, key
+  `BOLO_PROVIDER_GEMINI_API_KEY`): the Gemini Decisions API answers the same yes/no, choice and score questions as
+  the local decision models, through `POST /v1/audio/decisions` and `bolo decide`; the recording goes as a 16 kHz
+  WAV. Provider prices take a new unit, `per_1m_tokens` (input tokens, as the answer reports them). Written from
+  Google's public documentation and tested against a stand-in built from it; not run against a real account
+  (`options.not_yet_run`). Paid cloud API: the audio leaves this server.
 - **Cloudflare Clef-Omni as a decision model** (`clef-omni`, 70.8 GB, Apache-2.0): Qwen3-Omni 30B-A3B's thinker with
   Cloudflare's joint head, answering yes/no, choice and score questions about a text and a recording, through the
   torch plugin (`bolo-torch[clef-omni]`) and the model repository's `joint_schema_model.py` (remote code: pinned by
