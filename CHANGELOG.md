@@ -133,6 +133,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - **kale-tts-1-nano** (`kale-tts-1-nano-onnx`, Apache-2.0): ten synthetic English voices (two British) in one 14.8 MB
   graph, in process on ONNX Runtime with a Python port of Kale's own text front end (the same IPA as Kale's on 212 of
   its 214 test texts). 0.028 of real time on a 4-vCPU Xeon with 2 threads; transcribed back word for word.
+- **Multilingual Pocket TTS** (`pocket-tts-multilingual-llamacpp`, CC-BY-4.0): English, Hindi, Marathi, Kannada,
+  Tamil, Malayalam and Telugu in one community fine-tune of Kyutai Pocket TTS, on llama.cpp. This project converted it
+  to GGUF (published at codebucketsolutions/pocket-tts-multilingual-GGUF); voices are bolo's reference clips, Hindi
+  among them.
 - **eSpeak NG can write tied phonemes** (`a^ɪ`) for front ends that need them (`Phonemizer.phonemize(..., tie="^")`).
 
 ### Changed

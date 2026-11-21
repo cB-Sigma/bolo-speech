@@ -174,6 +174,12 @@ Voices converted by this project
     NON-COMMERCIAL use only. Each archive contains the licence text and the
     attribution.
 
+    codebucketsolutions/pocket-tts-multilingual-GGUF on Hugging Face is a format
+    conversion (GGUF, made with llama.cpp's converter) of Thanushttk's
+    "Multilingual Pocket TTS" (https://huggingface.co/Thanushttk/pocket-tts-multilingual),
+    a fine-tune of Kyutai Pocket TTS with Kyutai's Mimi codec weights, all
+    CC-BY-4.0. Its model card carries the attribution and the licence text.
+
     The optional end-of-turn model is Smart Turn v3 by the Pipecat project
     (https://huggingface.co/pipecat-ai/smart-turn-v3, BSD-2-Clause),
     downloaded on request like any other model. bolo's Whisper-style

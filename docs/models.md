@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-542 models: 238 validated on CPU by the maintainers, 304 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+543 models: 239 validated on CPU by the maintainers, 304 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -651,6 +651,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `zonos3-mini-llamacpp` (ZONOS3-Mini (llama.cpp)) | en, de, es, fr, hi, it +5 | accuracy | - | 2.0 GB | Apache-2.0 · runs on llama-server · GPU recommended | ran once here (shared CPU), not measured |
 | `fish-audio-s2-pro-llamacpp` (Fish Audio S2 Pro (llama.cpp)) | - | accuracy | - | 6.3 GB | Fish Audio Research License ⚠ · runs on llama-server · GPU recommended | ran once here (shared CPU), not measured |
 | `fish-drama-3-llamacpp` (Fish Audio Drama 3) | - | accuracy | - | 23.5 GB | Fish Audio Community License 1.0 ⚠ · runs on llama-server · GPU required | untested |
+| `pocket-tts-multilingual-llamacpp` (Multilingual Pocket TTS (community)) | en, hi, mr, kn, ta, ml +1 | balanced | - | 220 MB | CC-BY-4.0 · runs on llama-server | **CPU** · RTF 0.768 |
 
 #### External TTS server: audio.cpp
 
@@ -3076,6 +3077,17 @@ tokenizer.model, which is what the entries pull; files, sizes and revisions were
 listing, but the download needs that access, which the machine that runs bolo's checks does not have. The 102 voices of
 `gradium/phonon-voices` (Apache-2.0) work with every Phonon checkpoint and are not packaged yet: each entry has the
 checkpoint's default voice.
+
+**Multilingual Pocket TTS on llama.cpp** (`pocket-tts-multilingual-llamacpp`, CC-BY-4.0): Thanushttk's community
+fine-tune of Kyutai Pocket TTS, a 6-layer student with one tokenizer for English, Hindi, Marathi, Kannada, Tamil,
+Malayalam and Telugu. This project converted it with llama.cpp's own Pocket TTS converter (release b12521) and
+publishes the pair at codebucketsolutions/pocket-tts-multilingual-GGUF. One change to the converter was needed: the
+fine-tune's tokenizer is a BPE SentencePiece model where Kyutai's are unigram ones, so it is written as llama.cpp's
+SentencePiece tokenizer (the patch is in that repository); llama.cpp's token ids then equal SentencePiece's. Run on
+the 4-vCPU Xeon (2026-11-21) through bolo's HTTP API with bolo's Hindi reference clip: Hindi, Marathi and Tamil read
+back close by faster-whisper-small, Kannada and Malayalam sounding right (the recogniser wrote them in Devanagari),
+Telugu not recognised by whisper-small, English word for word; best of three warm Hindi runs at 0.77 of real time
+on the busy machine.
 
 **tiny-voca in process** (`tiny-voca-onnx`): the authors' ONNX export on ONNX Runtime, no server, with their
 phonemiser dizione (Apache-2.0; bolo carries a copy in `bolo/vendor/dizione`, its data comes with the model). One

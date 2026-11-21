@@ -1112,6 +1112,58 @@
     send_language: true
     hardware: {gpu: recommended, vram_gb: 4.2, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
     language_option: true
+- id: pocket-tts-multilingual-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Multilingual Pocket TTS (community)
+  languages: [en, hi, mr, kn, ta, ml, te]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 219524350
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/Thanushttk/pocket-tts-multilingual
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Multilingual Pocket TTS (Thanushttk, CC-BY-4.0; a community fine-tune of Kyutai Pocket TTS, not an official
+    Kyutai release): a 6-layer student with one tokenizer for English, Hindi, Marathi, Kannada, Tamil, Malayalam and
+    Telugu, code-mixing included, 24 kHz. Converted to GGUF by this project for upstream llama.cpp
+    (codebucketsolutions/pocket-tts-multilingual-GGUF; llama.cpp''s Pocket TTS converter with its tokenizer written as a
+    BPE SentencePiece one). The language is the text''s. Like Pocket TTS it needs a speaker reference for every request,
+    so its voices are bolo''s synthetic reference clips (or send reference_audio). Attribution required (CC-BY-4.0). Runs
+    in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
+  source_url: https://huggingface.co/Thanushttk/pocket-tts-multilingual
+  validated: cpu
+  measured:
+    rtf: 0.768
+    audio_s: 6.3
+    threads: 2
+    engine: llama.cpp b12521 llama-server (upstream release build, CPU), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared
+    date: '2026-11-21'
+    note: 'Through bolo''s HTTP API with the Hindi reference clip (alpha-hi): one Hindi sentence of about 6.3 s, best of
+      three warm runs (0.77 to 2.7 of real time: other jobs kept the machine busy). Short sentences in Hindi, Marathi,
+      Tamil, Kannada, Malayalam, Telugu and English came back as non-silent 24 kHz audio. Read back by faster-whisper-small:
+      English word for word; Hindi, Marathi and Tamil close (a vowel or a letter off in a few words); Kannada and Malayalam
+      sounding right but written by the recogniser in Devanagari; Telugu not recognised (whisper-small is weak in Telugu;
+      not judged by ear). llama.cpp''s token ids equal SentencePiece''s on Hindi and Tamil-English text.'
+  requires: [llama-server]
+  source:
+    repo: codebucketsolutions/pocket-tts-multilingual-GGUF
+    revision: 509ae3f99aace8b47d0035869bf6d9980b62aa61
+    include: [pocket-tts-multilingual-f16.gguf, mmproj-pocket-tts-multilingual-f32.gguf, LICENSE, README.md]
+  options:
+    runtime: llama-server
+    model_file: pocket-tts-multilingual-f16.gguf
+    mmproj_file: mmproj-pocket-tts-multilingual-f32.gguf
+    cloning: true
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.8, note: built for CPUs}
+  voices:
+  - {id: alpha-hi, name: Alpha (Hindi reference clip), gender: f, reference: hi-short}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
 - id: pocket-tts-en-audiocpp
   task: tts
   engine: tts-server
