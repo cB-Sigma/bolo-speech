@@ -118,3 +118,52 @@ def test_parakeet_features_come_from_float32_audio_whatever_the_model_dtype() ->
     assert mel.shape == (1, 101, 80) and mel.dtype == mx.float32
     with pytest.raises(ValueError, match="matmul"):  # what bolo used to do on the GPU
         audio.get_logmel(mx.array(samples).astype(mx.bfloat16), config)
+
+
+SOV_PROMPTS = {
+    "transcribe": "Transcribe the audio verbatim in the language's standard writing system.",
+    "transcribe_language": "Transcribe the {language_name} audio into text.",
+    "hotwords": "This audio may contain the following words or phrases: {hotwords}. ",
+}
+
+
+def test_mlx_audio_instructions_come_from_the_catalog() -> None:
+    assert mlx_engine.instruction(SOV_PROMPTS, None, None) == SOV_PROMPTS["transcribe"]
+    assert mlx_engine.instruction(SOV_PROMPTS, "fr-CA", None) == "Transcribe the French audio into text."
+    assert mlx_engine.instruction(SOV_PROMPTS, "de", " Kubernetes,\nbolo ") == (
+        "This audio may contain the following words or phrases: Kubernetes, bolo. "
+        "Transcribe the German audio into text."
+    )
+    no_hotwords = {"transcribe": "T."}
+    assert mlx_engine.instruction(no_hotwords, "de", "x") == "T."
+
+
+def test_mlx_audio_stt_sends_the_instruction_and_a_token_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    import numpy as np
+
+    from bolo.engines.base import STTRequest
+
+    calls: list[dict[str, object]] = []
+
+    class FakeModel:
+        def generate(self, samples: object, **kwargs: object) -> object:
+            calls.append({"n": len(samples), **kwargs})  # type: ignore[arg-type]
+            return SimpleNamespace(text=" heard \n")
+
+    monkeypatch.setattr(mlx_engine, "_run", lambda gpu, fn, *a, **k: fn(*a, **k))
+    model = object.__new__(mlx_engine.MlxAudioSTT)
+    model.gpu, model.prompts, model.model = False, SOV_PROMPTS, FakeModel()
+    model.tokens_per_s, model.max_new_tokens = 12.0, 100
+    out = model.transcribe(
+        [
+            STTRequest(np.zeros(32000, np.float32), language="es"),
+            STTRequest(np.zeros(100, np.float32)),
+            STTRequest(np.zeros(16000 * 30, np.float32), hotwords="bolo", temperature=0.3),
+        ]
+    )
+    assert [r.text for r in out] == ["heard", "", "heard"] and out[0].language == "es"
+    assert calls[0] == {"n": 32000, "prompt": "Transcribe the Spanish audio into text.", "max_tokens": 56,
+                        "temperature": 0.0}  # fmt: skip
+    assert str(calls[1]["prompt"]).startswith("This audio may contain") and calls[1]["max_tokens"] == 100
+    assert calls[1]["temperature"] == 0.3 and len(calls) == 2
+    assert "mlx-audio-stt" in mlx_engine.MlxEngine.kinds and mlx_engine.PACKAGES["mlx-audio-stt"][1] == "mlx-audio"

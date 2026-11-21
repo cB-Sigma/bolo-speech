@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-535 models: 233 validated on CPU by the maintainers, 302 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+537 models: 233 validated on CPU by the maintainers, 304 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -209,6 +209,14 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `parakeet-unified-en-streaming-560ms` | en | realtime | native | 663 MB | CC-BY-4.0 | **CPU** · RTF 4.694 |
 | `parakeet-unified-en-streaming-1120ms` | en | balanced | native | 663 MB | CC-BY-4.0 | untested |
 
+#### SOV-Transcribe
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `sov-transcribe-1-mlx-4bit` | en, fr, de, es, it, pt +1 | accuracy | pseudo | 15.6 GB | Apache-2.0 | untested |
+| `sov-transcribe-1-mlx-8bit` | en, fr, de, es, it, pt +1 | accuracy | pseudo | 28.2 GB | Apache-2.0 | untested |
+| `sov-transcribe-1` | en, fr, de, es, it, pt +1 | accuracy | pseudo | 53.3 GB | Apache-2.0 · needs plugin torch | untested |
+
 #### SraVaani
 
 | id | languages | tier | streaming | download | licence | validated |
@@ -260,12 +268,6 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `dicow-v3.3` | en | accuracy | pseudo | 3.6 GB | CC-BY-4.0 · needs plugin torch | **CPU** · RTF 0.453 |
 | `se-dicow` | en | accuracy | pseudo | 4.4 GB | Apache-2.0 · needs plugin torch | **CPU** · RTF 0.589 |
 | `dicow-v3.3-onnx` | en | accuracy | pseudo | 1.5 GB | CC-BY-4.0 | **CPU** · RTF 0.725 |
-
-#### SOV-Transcribe
-
-| id | languages | tier | streaming | download | licence | validated |
-| --- | --- | --- | --- | --- | --- | --- |
-| `sov-transcribe-1` | en, fr, de, es, it, pt +1 | accuracy | pseudo | 53.3 GB | Apache-2.0 · needs plugin torch | untested |
 
 #### Jais-ASR
 

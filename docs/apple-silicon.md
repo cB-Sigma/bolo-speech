@@ -46,6 +46,7 @@ array framework running models on the GPU through Metal. The extra installs `mlx
 | `whisper-tiny-mlx`, `whisper-base-mlx` | Whisper on mlx-whisper: 99 languages, translation, word timestamps | MIT |
 | `parakeet-tdt-ctc-110m-mlx` | NVIDIA Parakeet TDT-CTC 110M (English) on parakeet-mlx, word timestamps | CC-BY-4.0 |
 | `kokoro-v1.0-mlx` | Kokoro-82M on mlx-audio: 41 voices in English, Spanish, French, Hindi, Italian, Portuguese; voice blends | Apache-2.0 |
+| `sov-transcribe-1-mlx-4bit`, `-8bit` | Salesforce SOV-Transcribe-1 on mlx-audio 0.6.6 or later (nativ-community's 4- and 8-bit conversions, 15.6 and 28.2 GB): English, French, German, Spanish, Italian, Portuguese, Dutch; added, not yet run | Apache-2.0 |
 | `moshiko-mlx-q4`, `-q8`, `-bf16` | Moshi, full duplex, through `moshi_mlx` (`bolo components install moshi`) | CC-BY-4.0 |
 
 ```

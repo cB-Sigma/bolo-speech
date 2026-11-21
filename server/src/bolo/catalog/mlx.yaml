@@ -324,3 +324,79 @@
     name: Santa
     language: es-ES
     gender: m
+- id: sov-transcribe-1-mlx-4bit
+  task: stt
+  engine: mlx
+  kind: mlx-audio-stt
+  family: SOV-Transcribe
+  languages: [en, fr, de, es, it, pt, nl]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 15583236039
+  params: 26600000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/salesforce-sovereign-intelligence/SOV-Transcribe-1
+  commercial_use: true
+  gated: false
+  features: [punctuation, long-form]
+  description: 'Salesforce SOV-Transcribe-1 (a Whisper large-v3 encoder in front of Gemma 4 26B A4B; 26.6 B
+    parameters, about 4.6 B active) on MLX for Apple silicon, converted by nativ-community from the official revision
+    505d8fae: 4-bit decoder, audio encoder and projector in bfloat16 (15.6 GB). Speech to text in English,
+    French, German, Spanish, Italian, Portuguese and Dutch through mlx-audio''s own port of the model (0.6.6 or later;
+    no code from the model repository runs), with the prompts of the model card: the language when the request names
+    one, hotwords as words the audio may contain. No timestamps: segments are the pieces of at most 30 s bolo cut the
+    audio into. Needs bolo-speech[mlx] and about 19 GB of unified memory. Added, not yet run here. See
+    sov-transcribe-1 for the PyTorch route.'
+  source_url: https://huggingface.co/nativ-community/SOV-Transcribe-1-4bit
+  validated: untested
+  source:
+    repo: nativ-community/SOV-Transcribe-1-4bit
+    revision: 8a2f46d85735e55c0b6d1c8d882c570ed20d4d5c
+    exclude: [README.md, .gitattributes]
+  options:
+    max_chunk_s: 30.0
+    prompts:
+      transcribe: Transcribe the audio verbatim in the language's standard writing system, using punctuation and
+        capitalization. Output only the transcript.
+      transcribe_language: Transcribe the {language_name} audio into text, ensuring all punctuation marks are included.
+      hotwords: 'This audio may contain the following words or phrases: {hotwords}. '
+    not_yet_run: true
+    hardware: {gpu: required, ram_gb: 19, note: 'Apple silicon unified memory; weights x 1.2'}
+- id: sov-transcribe-1-mlx-8bit
+  task: stt
+  engine: mlx
+  kind: mlx-audio-stt
+  family: SOV-Transcribe
+  languages: [en, fr, de, es, it, pt, nl]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 28194050106
+  params: 26600000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/salesforce-sovereign-intelligence/SOV-Transcribe-1
+  commercial_use: true
+  gated: false
+  features: [punctuation, long-form]
+  description: 'Salesforce SOV-Transcribe-1 (a Whisper large-v3 encoder in front of Gemma 4 26B A4B; 26.6 B
+    parameters, about 4.6 B active) on MLX for Apple silicon, converted by nativ-community from the official revision
+    505d8fae: 8-bit decoder, audio encoder and projector in bfloat16 (28.2 GB). Speech to text in English,
+    French, German, Spanish, Italian, Portuguese and Dutch through mlx-audio''s own port of the model (0.6.6 or later;
+    no code from the model repository runs), with the prompts of the model card: the language when the request names
+    one, hotwords as words the audio may contain. No timestamps: segments are the pieces of at most 30 s bolo cut the
+    audio into. Needs bolo-speech[mlx] and about 34 GB of unified memory. Added, not yet run here. See
+    sov-transcribe-1 for the PyTorch route.'
+  source_url: https://huggingface.co/nativ-community/SOV-Transcribe-1-8bit
+  validated: untested
+  source:
+    repo: nativ-community/SOV-Transcribe-1-8bit
+    revision: b0293c864bc749647fc08d6719a3b7cfec4a33b4
+    exclude: [README.md, .gitattributes]
+  options:
+    max_chunk_s: 30.0
+    prompts:
+      transcribe: Transcribe the audio verbatim in the language's standard writing system, using punctuation and
+        capitalization. Output only the transcript.
+      transcribe_language: Transcribe the {language_name} audio into text, ensuring all punctuation marks are included.
+      hotwords: 'This audio may contain the following words or phrases: {hotwords}. '
+    not_yet_run: true
+    hardware: {gpu: required, ram_gb: 34, note: 'Apple silicon unified memory; weights x 1.2'}

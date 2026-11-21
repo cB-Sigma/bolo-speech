@@ -8,6 +8,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **SOV-Transcribe-1 on MLX for Apple silicon** (`sov-transcribe-1-mlx-4bit`, 15.6 GB, and
+  `sov-transcribe-1-mlx-8bit`, 28.2 GB; Apache-2.0): nativ-community's conversions of the official revision, through
+  mlx-audio's own port of the model (no code from the model repository runs), on a new MLX kind `mlx-audio-stt` whose
+  instructions come from the catalog entry (`options.prompts`). The `mlx` extra now needs mlx-audio 0.6.6, the first
+  release with the model. Added, not yet run (`options.not_yet_run`).
 - **Jais-ASR, Reverb ASR and Reverb diarization v2 through the torch plugin, added, not yet run.** IFM's Jais-ASR
   (`jais-asr`, Apache-2.0, Arabic with its dialects plus English, French, Spanish and Italian, 11.4 GB) on a new
   generic transformers pipeline loader, its remote code pinned and run only after the per-model opt-in. Rev's

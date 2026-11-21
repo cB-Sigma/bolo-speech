@@ -1,7 +1,7 @@
 """MLX: speech models on Apple silicon's GPU through Apple's array framework (``bolo-speech[mlx]``).
 
 Optional, in process, macOS arm64 only as an extra (MLX also has Linux CPU wheels, ``mlx[cpu]``, which run these
-models on the CPU: that is how they were first run). Three kinds:
+models on the CPU: that is how they were first run). Four kinds:
 
 * ``mlx-whisper``: Whisper in the MLX format (``weights.npz`` or ``weights.safetensors`` with ``config.json``, the
   ``mlx-community/whisper-*-mlx`` repositories) through ``mlx-whisper`` (Apple's port in ``ml-explore/mlx-examples``):
@@ -11,6 +11,11 @@ models on the CPU: that is how they were first run). Three kinds:
 * ``kokoro`` (``engine: mlx``): Kokoro-82M through ``mlx-audio``'s port of the model. bolo phonemises the text itself
   (uccharan's Kokoro front end, as for the sherpa-onnx Kokoro voices) and gives the model the phonemes, so mlx-audio's
   own front end (misaki, which needs spaCy and espeak-ng) is not needed. Voice blends work as for sherpa-onnx.
+* ``mlx-audio-stt``: speech-to-text models of ``mlx-audio`` (``mlx_audio.stt.load``; mlx-audio's own port of the model,
+  no code from the model repository) that take an instruction, such as SOV-Transcribe-1. The instruction comes from
+  the catalog entry (``options.prompts``: ``transcribe``, ``transcribe_language`` with ``{language_name}``, and
+  ``hotwords`` with ``{hotwords}`` put in front); the model gives no timestamps, so segments are the pieces bolo cut
+  the audio into (``max_chunk_s``).
 
 Device: a model placed on the GPU (``device`` ``coreml``/``mps``/``metal``/``mlx``, or ``auto`` on a Mac) runs on
 MLX's GPU stream (Metal); placed on the CPU it runs on MLX's CPU stream. MLX's streams belong to the thread that made
@@ -51,6 +56,7 @@ PACKAGES = {
     "mlx-whisper": ("mlx_whisper", "mlx-whisper"),
     "parakeet-mlx": ("parakeet_mlx", "parakeet-mlx"),
     "kokoro": ("mlx_audio", "mlx-audio"),
+    "mlx-audio-stt": ("mlx_audio", "mlx-audio"),
 }
 #: the one thread every call into MLX runs on (MLX's streams are per thread)
 _WORKER = ThreadPoolExecutor(max_workers=1, thread_name_prefix="bolo-mlx")
@@ -273,6 +279,61 @@ def _words(tokens: list[Any]) -> list[Word]:
     return words
 
 
+# -- instruction-following recognisers of mlx-audio ---------------------------------------------------------------
+def instruction(prompts: dict[str, str], language: str | None, hotwords: str | None) -> str:
+    """The instruction of one request from a catalog entry's ``prompts`` (see the module docstring)."""
+    from bolo.text.iso639 import name as language_name
+
+    code = (language or "").strip().lower().split("-", 1)[0]
+    text = (prompts.get("transcribe_language") if code else None) or prompts["transcribe"]
+    text = text.format(language_name=language_name(code) if code else "")
+    terms = ", ".join(t.strip() for t in (hotwords or "").replace("\n", ",").split(",") if t.strip())
+    if terms and prompts.get("hotwords"):
+        text = prompts["hotwords"].format(hotwords=terms) + text
+    return text
+
+
+class MlxAudioSTT(STTModel):
+    supports_translate = False
+    supports_word_timestamps = False
+    request_fields = ("hotwords", "temperature")
+
+    def __init__(self, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
+        _require("mlx-audio-stt")
+        from mlx_audio.stt import load
+
+        self.gpu = _placed(opts)
+        self.device = "metal" if self.gpu else "cpu"
+        self.prompts = {str(k): str(v) for k, v in (spec.get("prompts") or {}).items()}
+        if "transcribe" not in self.prompts:
+            raise EngineUnavailable(f"model '{spec.get('model_id')}': the catalog entry's prompts name no 'transcribe'")
+        self.languages = tuple(spec.get("languages") or ())
+        self.max_chunk_s = float(spec.get("max_chunk_s") or 30.0)
+        self.tokens_per_s = float(spec.get("tokens_per_s") or 12.0)
+        self.max_new_tokens = int(spec.get("max_new_tokens") or 8192)
+        self.model = _run(self.gpu, load, Path(path))
+
+    def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:
+        out: list[STTResult] = []
+        for r in requests:
+            samples = np.asarray(r.samples, dtype=np.float32)
+            if r.abort.is_set() or len(samples) < 800:  # 50 ms
+                out.append(STTResult("", r.language))
+                continue
+            seconds = len(samples) / 16000
+            kwargs: dict[str, Any] = {
+                "prompt": instruction(self.prompts, r.language, r.hotwords),
+                "max_tokens": max(16, min(self.max_new_tokens, int(seconds * self.tokens_per_s) + 32)),
+                "temperature": float(r.temperature or 0.0),
+            }
+            result = _run(self.gpu, self.model.generate, samples, **kwargs)
+            out.append(STTResult(str(getattr(result, "text", "") or "").strip(), r.language))
+        return out
+
+    def close(self) -> None:
+        self.model = None
+
+
 # -- Kokoro ------------------------------------------------------------------------------------------------------
 #: Kokoro's phoneme input holds at most 510 symbols (512 positions with the two pads)
 _KOKORO_MAX = 510
@@ -384,7 +445,7 @@ class MlxEngine(Engine):
     name = "MLX (Apple silicon)"
     license = "MIT (mlx, mlx-whisper, mlx-audio); Apache-2.0 (parakeet-mlx)"
     url = "https://github.com/ml-explore/mlx"
-    kinds = ("mlx-whisper", "parakeet-mlx", "kokoro")
+    kinds = ("mlx-whisper", "parakeet-mlx", "kokoro", "mlx-audio-stt")
 
     def status(self) -> EngineStatus:
         from importlib.metadata import version
@@ -413,6 +474,8 @@ class MlxEngine(Engine):
             return ParakeetMlxSTT(path, spec, opts)
         if kind == "kokoro":
             return MlxKokoroTTS(path, spec, opts)
+        if kind == "mlx-audio-stt":
+            return MlxAudioSTT(path, spec, opts)
         raise ValueError(f"the MLX engine cannot load models of kind {kind!r}")
 
     def detect(self, path: Path) -> dict[str, Any] | None:
