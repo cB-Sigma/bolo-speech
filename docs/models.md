@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-545 models: 240 validated on CPU by the maintainers, 305 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+546 models: 240 validated on CPU by the maintainers, 306 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -674,6 +674,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `moss-tts-local-v1.5-audiocpp` (MOSS-TTS Local Transformer v1.5) | en, ar, cs, da, de, el +25 | accuracy | - | 7.5 GB | Apache-2.0 · runs on audio.cpp · GPU required | untested |
 | `moss-tts-nano-100m-audiocpp` (MOSS-TTS Nano 100M) | en, ar, cs, da, de, el +13 | balanced | - | 193 MB | Apache-2.0 · runs on audio.cpp | **CPU** · RTF 1.051 · first audio 5969 ms · round-trip WER 5.3% · cloned voice: speaker similarity 0.65 |
 | `omnivoice-audiocpp` (OmniVoice) | - | accuracy | - | 1.4 GB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · GPU recommended | **CPU** · RTF 37.849 · first audio 210438 ms · round-trip WER 55.2% · cloned voice: speaker similarity 0.12 |
+| `voicetut-tts-audiocpp` (VoiceTut-TTS) | ar, en | accuracy | - | 1.4 GB | Apache-2.0 (model card); audio tokenizer under the Boson … ⚠ · runs on audio.cpp · GPU recommended | untested |
 | `voxtral-4b-tts-audiocpp` (Voxtral 4B TTS) | en, ar, de, es, fr, hi +3 | accuracy | - | 8.0 GB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · GPU required | untested |
 | `fish-audio-s2-pro-audiocpp` (Fish Audio S2 Pro) | - | accuracy | - | 6.3 GB | Fish Audio Research License ⚠ · runs on audio.cpp · GPU required | untested |
 | `fish-drama-3-audiocpp` (Fish Audio Drama 3) | - | accuracy | - | 24.6 GB | Fish Audio Community License v1.0 ⚠ · runs on audio.cpp · GPU required | untested |
@@ -3082,6 +3083,15 @@ languages (the 31M and the English 40M the 37 English ones, the multilingual 40M
 default voice: bolo puts each voice's file in the model's `embeddings/` folder, where audio.cpp finds it by name. On
 the 31M (2026-11-21, audio.cpp v0.9.4 built here) the default voice and four packaged ones, Zoey, Easton, Maeve and the
 character Captain Silas Blackwater, came back word for word from faster-whisper-small, each in its own voice.
+
+**Added, not yet run, on audio.cpp: VoiceTut-TTS** (`voicetut-tts-audiocpp`, Egyptian Arabic with English code-switching,
+1.35 GB): its author's Q8_0 GGUF on audio.cpp's omnivoice family, with the language id `arz` the author asks for
+sent on every request. Tried on the 4-vCPU Xeon (2026-11-21, audio.cpp v0.9.4 built here, a reference clip as the
+voice): an Egyptian Arabic and an English sentence each took about 4 to 6 minutes for 2 s and came back as loud noise
+("AHHHHHH!" from faster-whisper-small for "Hello, how are you today?"). OmniVoice itself was poor on this CPU too
+(above), and the author measured on a GPU, so it stays marked as not run until it is tried there. The model card says
+Apache-2.0, but the audio tokenizer it reuses is under the Boson Higgs Audio 2 Community License and OmniVoice moved to
+a non-commercial licence, so the entry is marked not for commercial use until that is clear.
 
 **Added, not yet run, on audio.cpp** (`options.not_yet_run: true`): Cilla Mini (`cilla-mini-audiocpp`, Persian, about 113 MB, 18.2 M parameters, audio.cpp's pocket_tts_small family),
 from Oncilla AI. CC BY-NC 4.0 (commercial use needs a paid plan from Oncilla AI) and gated behind a terms form, so it

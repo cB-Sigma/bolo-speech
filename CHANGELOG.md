@@ -144,6 +144,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - **Gradium Phonon's 102 voices** (gradium/phonon-voices, Apache-2.0) on the Phonon entries, by language: 37 English
   voices on Phonon 31M and 40M English, all 102 on the multilingual 40M, the French, German, Spanish and Portuguese ones
   on theirs. Checked on Phonon 31M on audio.cpp: each voice speaks in its own voice, read back word for word.
+- **VoiceTut-TTS** (`voicetut-tts-audiocpp`, Egyptian Arabic and English): its author's GGUF on audio.cpp's omnivoice
+  family, always sent the `arz` language id; added, not yet run usefully (on a CPU it came back as noise; a GPU is
+  what its author used). Marked not for commercial use until the licence of its audio tokenizer is clear.
 - **eSpeak NG can write tied phonemes** (`a^ɪ`) for front ends that need them (`Phonemizer.phonemize(..., tie="^")`).
 
 ### Changed

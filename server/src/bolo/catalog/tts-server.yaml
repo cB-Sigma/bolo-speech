@@ -1558,6 +1558,47 @@
   - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
   - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
   - {id: alpha-hi, name: Alpha (Hindi reference clip), gender: f, reference: hi-short}
+- id: voicetut-tts-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: VoiceTut-TTS
+  languages: [ar, en]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 1350264224
+  license: Apache-2.0 (model card); audio tokenizer under the Boson Higgs Audio 2 Community License
+  license_url: https://huggingface.co/mohammedaly22/VoiceTut-TTS
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'VoiceTut-TTS (Mohammed Aly): an OmniVoice fine-tune on about 380 hours of Egyptian podcast speech. It speaks
+    Egyptian Arabic and switches to English mid-sentence, and clones a voice from a reference recording. The Q8_0 GGUF of
+    its author, on audio.cpp''s omnivoice family; bolo always sends the Egyptian Arabic language id (arz), as the author
+    asks. Its model card declares Apache-2.0, but it reuses OmniVoice''s audio tokenizer (bosonai/higgs-audio-v2-tokenizer,
+    Boson Higgs Audio 2 Community License) and OmniVoice itself moved to a non-commercial licence because of its training
+    data, so bolo marks it not for commercial use until that is clear. The author''s 17 named voices are not packaged:
+    send reference_audio, or use the reference-clip voices. Runs in an audiocpp_server that bolo starts (bolo components
+    install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 2.3 GB; slow on a CPU.'
+  source_url: https://huggingface.co/mohammedaly22/VoiceTut-TTS
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: mohammedaly22/VoiceTut-TTS-GGUF
+    revision: 615457bb2e9043f468e012c159146b28fa8f5959
+    include: [voicetut-tts-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: omnivoice
+    server_model: voicetut-tts-audiocpp
+    cloning: true
+    send_language: false
+    request: {language: arz}
+    hardware: {gpu: recommended, vram_gb: 2.5, note: 'slow on a CPU: OmniVoice ran at about 40 times real time on a 4-vCPU Xeon'}
+    not_yet_run: true
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
 - id: voxtral-4b-tts-audiocpp
   task: tts
   engine: tts-server
