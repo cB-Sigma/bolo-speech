@@ -1203,6 +1203,45 @@
   voices:
   - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
   - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: cilla-mini-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Cilla (Persian)
+  languages: [fa]
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 112734305
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/mehdi-hf/cilla-mini
+  commercial_use: false
+  gated: true
+  features: [voice-cloning]
+  description: 'Cilla Mini (Oncilla AI, mehdi-hf): Persian text to speech, 18.2 M parameters made with Kyutai''s small
+    Pocket TTS recipe (8 layers, a one-step sampler head), 24 kHz, cloning the voice of a short prompt. The published
+    safetensors on audio.cpp''s pocket_tts_small family, which loads that layout. CC BY-NC 4.0: free for non-commercial
+    use, commercial use needs a paid plan from Oncilla AI. Gated: accept the terms on the model page and give bolo a
+    token (hf_token). The authors read one sentence at a time after their own Persian normaliser (normalize_fa.py), and
+    turn off Pocket TTS''s capitalisation and final full stop; bolo''s audio.cpp path has neither. Runs in an
+    audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers).'
+  source_url: https://huggingface.co/mehdi-hf/cilla-mini
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: mehdi-hf/cilla-mini
+    revision: 480d6002169ee62ac7b88eed845e6624208a2ea2
+    include: [model.safetensors, config.yaml, tokenizer.model, prompts/*, README.md, normalize_fa.py]
+  options:
+    runtime: audio.cpp
+    family: pocket_tts_small
+    server_model: cilla-mini-audiocpp
+    cloning: true
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.3, note: small enough for any CPU}
+    not_yet_run: true
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
 - id: pocket-tts-en-audiocpp
   task: tts
   engine: tts-server

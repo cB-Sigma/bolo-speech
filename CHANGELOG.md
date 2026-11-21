@@ -139,6 +139,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   among them.
 - **Cilla Lite** (`cilla-lite-audiocpp`, Persian, CC BY-NC 4.0, gated): on audio.cpp from its published
   safetensors; added, not yet run (the download needs the terms accepted on Hugging Face).
+- **Cilla Mini** (`cilla-mini-audiocpp`, Persian, CC BY-NC 4.0, gated): on audio.cpp from its published
+  safetensors; added, not yet run (the download needs the terms accepted on Hugging Face).
 - **eSpeak NG can write tied phonemes** (`a^ɪ`) for front ends that need them (`Phonemizer.phonemize(..., tie="^")`).
 
 ### Changed

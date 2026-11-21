@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-544 models: 239 validated on CPU by the maintainers, 305 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+545 models: 239 validated on CPU by the maintainers, 306 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -666,6 +666,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `qwen3-tts-0.6b-base-audiocpp` (Qwen3-TTS 0.6B Base) | en, de, es, fr, it, ja +4 | accuracy | - | 2.0 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | **CPU** · RTF 3.237 · first audio 17611 ms · round-trip WER 0.0% · cloned voice: speaker similarity 0.72 |
 | `qwen3-tts-1.7b-customvoice-audiocpp` (Qwen3-TTS 1.7B CustomVoice) | en, de, es, fr, it, ja +4 | accuracy | - | 2.8 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
 | `cilla-lite-audiocpp` (Cilla (Persian)) | fa | balanced | - | 439 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
+| `cilla-mini-audiocpp` (Cilla (Persian)) | fa | realtime | - | 113 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
 | `pocket-tts-en-audiocpp` (Kyutai Pocket TTS (English)) | en | balanced | - | 134 MB | CC-BY-4.0 · runs on audio.cpp | **CPU** · RTF 9.713 · first audio 45069 ms · round-trip WER 0.0% · cloned voice: speaker similarity 0.57 |
 | `soprano-1.1-80m-audiocpp` (Soprano 1.1 80M) | en | balanced | - | 123 MB | Apache-2.0 · runs on audio.cpp | untested |
 | `supertonic-3-audiocpp` (Supertonic 3) | en, ar, bg, cs, da, de +25 | accuracy | - | 454 MB | BigScience OpenRAIL-M · runs on audio.cpp · GPU recommended | untested |
@@ -3078,6 +3079,13 @@ tokenizer.model, which is what the entries pull; files, sizes and revisions were
 listing, but the download needs that access, which the machine that runs bolo's checks does not have. The 102 voices of
 `gradium/phonon-voices` (Apache-2.0) work with every Phonon checkpoint and are not packaged yet: each entry has the
 checkpoint's default voice.
+
+**Added, not yet run, on audio.cpp** (`options.not_yet_run: true`): Cilla Mini (`cilla-mini-audiocpp`, Persian, about 113 MB, 18.2 M parameters, audio.cpp's pocket_tts_small family),
+from Oncilla AI. CC BY-NC 4.0 (commercial use needs a paid plan from Oncilla AI) and gated behind a terms form, so it
+was not downloaded here. audio.cpp v0.9.4 loads that family from the published layout (`model.safetensors`,
+`config.yaml`, `tokenizer.model` at the root), which is what the entry pulls. The authors' own runtime normalises
+Persian text (their `normalize_fa.py`, pulled with the model) and turns off Pocket TTS's capitalisation and final full
+stop; bolo's audio.cpp path does neither, which the first run should check.
 
 **Added, not yet run, on audio.cpp** (`options.not_yet_run: true`): Cilla Lite (`cilla-lite-audiocpp`, Persian, about 440 MB, 100 M parameters, audio.cpp's pocket_tts family),
 from Oncilla AI. CC BY-NC 4.0 (commercial use needs a paid plan from Oncilla AI) and gated behind a terms form, so it
