@@ -4,11 +4,11 @@ import asyncio
 import hashlib
 import http.server
 import json
+import logging
 import re
 import subprocess
 import sys
 import threading
-import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -18,6 +18,7 @@ from bolo.catalog import FAKE_MODELS, Catalog, CatalogError, ModelSpec, packaged
 from bolo.custom import choose_files, detect_kind
 from bolo.errors import DownloadError, GatedModel, ModelNotFound
 from bolo.store import HubClient, ModelStore, RemoteFile, Source, git_blob_sha1, match_patterns, safe_id
+from conftest import WAIT_S, wait_until
 
 BIG = bytes(range(256)) * 4096  # 1 MiB of LFS content
 SMALL = b"token 0\nother 1\n"
@@ -31,7 +32,8 @@ class Hub(http.server.BaseHTTPRequestHandler):
     truncate_once = False
     corrupt = False
     gated = False
-    slow = 0.0  # seconds a file takes to send
+    #: when set, a file is sent in two halves with a wait for this event between them (a download in progress)
+    hold: threading.Event | None = None
 
     def log_message(self, *args: object) -> None:
         pass
@@ -87,12 +89,11 @@ class Hub(http.server.BaseHTTPRequestHandler):
                 self.wfile.flush()
                 self.connection.close()
                 return
-            if cls.slow:
-                step = max(1, len(payload) // 16)
-                for i in range(0, len(payload), step):
-                    self.wfile.write(payload[i : i + step])
-                    self.wfile.flush()
-                    time.sleep(cls.slow / 16)
+            if cls.hold is not None:
+                self.wfile.write(payload[: len(payload) // 2])
+                self.wfile.flush()
+                cls.hold.wait(WAIT_S)
+                self.wfile.write(payload[len(payload) // 2 :])
                 return
             self.wfile.write(payload)
             return
@@ -102,7 +103,7 @@ class Hub(http.server.BaseHTTPRequestHandler):
 
 @pytest.fixture
 def hub() -> Iterator[str]:
-    Hub.requests, Hub.truncate_once, Hub.corrupt, Hub.gated, Hub.slow = [], False, False, False, 0.0
+    Hub.requests, Hub.truncate_once, Hub.corrupt, Hub.gated, Hub.hold = [], False, False, False, None
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Hub)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -724,8 +725,10 @@ async def test_no_manifest_stays_open_after_a_component_missing_load(
 
 
 _PULL = """
+import logging
 import sys
 from pathlib import Path
+logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(message)s")
 from bolo.store import HubClient, ModelStore, Source
 store = ModelStore(Path(sys.argv[1]), HubClient(sys.argv[2]))
 manifest = store.pull("same-model", Source(urls=[{"path": "m.onnx", "url": sys.argv[3]}]))
@@ -736,17 +739,23 @@ print(manifest["size_bytes"], manifest["installed_at"])
 def test_two_processes_pulling_the_same_model_fetch_it_once(hub: str, tmp_path: Path) -> None:
     """The server pulling a model on first use while ``bolo pull`` fetches the same one (WinError 32 on both sides
     on Windows: two writers of one .part file): the second waits for the first and takes the finished model. The
-    file has no checksum in the source, so a second fetch of it could not be skipped otherwise."""
-    Hub.slow = 2.0
+    file has no checksum in the source, so a second fetch of it could not be skipped otherwise. The first one's
+    download is held half-way until the second says it is waiting for it (no timing: a busy machine can take
+    seconds to start a Python process)."""
+    Hub.hold = threading.Event()
     url = f"{hub}/org/model/resolve/main/model.int8.onnx"
     data = tmp_path / "data"
     args = [sys.executable, "-c", _PULL, str(data), hub, url]
     first = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    deadline = time.monotonic() + 60
-    while not Hub.requests and time.monotonic() < deadline:  # the first is downloading
-        time.sleep(0.02)
+    wait_until(lambda: Hub.requests, "the first process is downloading")
     second = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    outs = [p.communicate(timeout=120) for p in (first, second)]
+    assert second.stderr is not None
+    said = [second.stderr.readline()]  # ends at exit, so a second that never waits fails below, not hangs
+    while said[-1] and "another process is pulling it" not in said[-1]:
+        said.append(second.stderr.readline())
+    Hub.hold.set()
+    outs = [p.communicate(timeout=WAIT_S) for p in (first, second)]
+    assert "another process is pulling it" in said[-1], said
     assert [p.returncode for p in (first, second)] == [0, 0], [err for _, err in outs]
     assert outs[0][0] == outs[1][0]  # the same manifest: the second took the first's
     assert [path for path, _ in Hub.requests] == ["/org/model/resolve/main/model.int8.onnx"]  # fetched once
@@ -755,8 +764,11 @@ def test_two_processes_pulling_the_same_model_fetch_it_once(hub: str, tmp_path: 
     assert not list((data / "blobs" / "partial").glob("*.part"))
 
 
-def test_threads_pulling_the_same_model_fetch_it_once(hub: str, tmp_path: Path) -> None:
-    Hub.slow = 1.0
+def test_threads_pulling_the_same_model_fetch_it_once(
+    hub: str, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger="bolo.store")
+    Hub.hold = threading.Event()  # the first download is held until the second pull waits for it
     store = ModelStore(tmp_path, HubClient(hub))
     src = Source(urls=[{"path": "m.onnx", "url": f"{hub}/org/model/resolve/main/model.int8.onnx"}])
     results: list[dict[str, object]] = []
@@ -769,8 +781,10 @@ def test_threads_pulling_the_same_model_fetch_it_once(hub: str, tmp_path: Path) 
     ]
     for t in threads:
         t.start()
+    wait_until(lambda: "waiting for another pull of it to finish" in caplog.text, "the second pull waits")
+    Hub.hold.set()
     for t in threads:
-        t.join(timeout=60)
+        t.join(timeout=WAIT_S)
     assert len(results) == 2 and results[0] == results[1] and len(Hub.requests) == 1
     assert (len(BIG), len(BIG)) in progress  # the one that waited reports the finished model
 
