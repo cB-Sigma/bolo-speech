@@ -1,3 +1,4 @@
+import { waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { emptyTranscript, type TranscriptState } from '@/lib/stt/transcriber'
 import { Conversation, takeSentences, type Speaker } from './conversation'
@@ -39,7 +40,7 @@ describe('voice conversation in the page', () => {
     const c = new Conversation(() => f.llm, f.speaker)
     const t: TranscriptState = { ...emptyTranscript(), finals: [final('What is the weather?')] }
     c.onTranscript(t)
-    await new Promise((r) => setTimeout(r, 60))
+    await waitFor(() => expect(c.store.get().status).toBe('listening'))
     expect(f.said).toEqual(['Sure.', 'It is sunny today.'])
     const turns = c.store.get().turns
     expect(turns.map((x) => x.role)).toEqual(['user', 'assistant'])
@@ -50,15 +51,22 @@ describe('voice conversation in the page', () => {
   })
 
   it('barge-in: speaking while it answers stops the reply and the speech', async () => {
-    const f = fakes('One. Two. Three. Four. Five. Six. ', 20)
-    const c = new Conversation(() => f.llm, f.speaker)
+    const f = fakes('One. Two. Three. Four. Five. Six. ')
+    // the model says "One." and then waits (as if still generating) until the barge-in stops it
+    const llm: ChatBackend = {
+      async reply(_m, onToken, signal) {
+        onToken('One. ')
+        await new Promise((r) => signal.addEventListener('abort', r, { once: true }))
+        return 'One. '
+      },
+    }
+    const c = new Conversation(() => llm, f.speaker)
     c.onTranscript({ ...emptyTranscript(), finals: [final('Count to six.')] })
-    await new Promise((r) => setTimeout(r, 50))
+    await waitFor(() => expect(f.said).toEqual(['One.']))
     c.onTranscript({ ...emptyTranscript(), finals: [final('Count to six.')], speech: [{ t0: 2, t1: null }] })
-    await new Promise((r) => setTimeout(r, 150))
-    expect(f.stopped()).toBe(1)
+    await waitFor(() => expect(f.stopped()).toBe(1))
     expect(c.store.get().bargeIns).toBe(1)
     expect(c.store.get().turns.at(-1)?.interrupted).toBe(true)
-    expect(f.said.length).toBeLessThan(6)
+    expect(f.said).toEqual(['One.'])
   })
 })
