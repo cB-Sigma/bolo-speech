@@ -4,6 +4,8 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-11-22
+
 ### Added
 
 - **SpeechBrain direct spoken-language understanding** (kind `speechbrain-slu`, extra `slu`, op `intent`):

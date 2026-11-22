@@ -6,6 +6,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-22
+
 ### Added
 
 - **Spoken intent: what a speaker wants, straight from the audio** (new task `intent`). `POST /v1/audio/intent`
