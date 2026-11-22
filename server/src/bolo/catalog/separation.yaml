@@ -208,3 +208,85 @@
   options:
     model_sample_rate: 8000
     speakers: 3
+- id: sepformer-whamr16k
+  task: separation
+  engine: onnxruntime
+  kind: sepformer_onnx
+  family: SepFormer
+  languages: [en]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 106064473
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/sepformer-whamr16k
+  description: 'SpeechBrain SepFormer trained on WHAMR! at 16 kHz (noisy, reverberant read English): blind separation
+    of two overlapping voices, used by separate_overlaps. SpeechBrain reports 13.5 dB SI-SNRi on the WHAMR! test set.
+    Runs in ONNX Runtime without PyTorch (an unchanged export of the weights,
+    codebucketsolutions/sepformer-whamr16k-onnx). Weights Apache-2.0; WHAMR! is built from WSJ0 (LDC93S6A, Linguistic
+    Data Consortium licence: a provenance risk for commercial use) with WHAM! noise (CC BY-NC 4.0). Slower than real
+    time on CPU.'
+  source_url: https://huggingface.co/speechbrain/sepformer-whamr16k
+  validated: cpu
+  measured:
+    rtf: 1.766
+    load_s: 0.59
+    audio_s: 13.15
+    memory_mb: 934
+    threads: 2
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 6-17)
+    date: '2026-11-21'
+    test_audio: bolo samples en-long, en-short and hi-short mixed two and three at a time (3.0-4.1 s each)
+    note: 'Synthetic equal-power mixtures of bolo''s three sample voices (en-long male, en-short and hi-short female;
+      all starting together, 16 kHz), full-band references, best permutation. Mean SI-SNR improvement per two-voice
+      mix: en-long m + en-short f -2.9 dB; en-long m + hi-short f +3.9 dB; en-short f + hi-short f -0.9 dB; three
+      voices: -1.7 dB (per voice -0.2, -1.2, -3.8) from the two-speaker model''s two tracks. The ONNX graph matches
+      SpeechBrain''s PyTorch model (parity.json in the repository).'
+  source:
+    repo: codebucketsolutions/sepformer-whamr16k-onnx
+    revision: 9e2bd8ea10824394f796a1a5229a0478dce3d119
+    include: [sepformer.onnx, speechbrain_onnx.json]
+  options:
+    model_sample_rate: 16000
+    speakers: 2
+- id: sepformer-whamr
+  task: separation
+  engine: onnxruntime
+  kind: sepformer_onnx
+  family: SepFormer
+  languages: [en]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 106064469
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/sepformer-whamr
+  description: 'SpeechBrain SepFormer trained on WHAMR! (noisy, reverberant read English at 8 kHz, the telephone
+    band): blind separation of two overlapping voices, used by separate_overlaps. bolo hands it 16 kHz audio,
+    resampled to 8 kHz and back. SpeechBrain reports 13.7 dB SI-SNRi on the WHAMR! test set. Runs in ONNX Runtime
+    without PyTorch (an unchanged export of the weights, codebucketsolutions/sepformer-whamr-onnx). Weights
+    Apache-2.0; WHAMR! is built from WSJ0 (LDC93S6A, Linguistic Data Consortium licence: a provenance risk for
+    commercial use) with WHAM! noise (CC BY-NC 4.0).'
+  source_url: https://huggingface.co/speechbrain/sepformer-whamr
+  validated: cpu
+  measured:
+    rtf: 0.913
+    load_s: 0.49
+    audio_s: 13.15
+    memory_mb: 610
+    threads: 2
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 2-12)
+    date: '2026-11-21'
+    test_audio: bolo samples en-long, en-short and hi-short mixed two and three at a time (3.0-4.1 s each)
+    note: 'Synthetic equal-power mixtures of bolo''s three sample voices (en-long male, en-short and hi-short female;
+      all starting together, 16 kHz), references band-limited to 8 kHz, best permutation. Mean SI-SNR improvement per
+      two-voice mix: en-long m + en-short f +1.8 dB; en-long m + hi-short f +3.1 dB; en-short f + hi-short f +3.0 dB;
+      three voices: -2.9 dB (per voice -0.4, +0.9, -9.0) from the two-speaker model''s two tracks. The ONNX graph
+      matches SpeechBrain''s PyTorch model (parity.json in the repository).'
+  source:
+    repo: codebucketsolutions/sepformer-whamr-onnx
+    revision: 290feb42674fedf1ffed30b3cda249d2b75f98b1
+    include: [sepformer.onnx, speechbrain_onnx.json]
+  options:
+    model_sample_rate: 8000
+    speakers: 2

@@ -37,6 +37,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Changed
 
+- **The WHAMR! SepFormers run in ONNX Runtime, without PyTorch**: `sepformer-whamr16k` and `sepformer-whamr` moved
+  from the torch plugin to the `sepformer_onnx` kind like the other SepFormers (ids unchanged; weights exported
+  unchanged to codebucketsolutions/sepformer-whamr16k-onnx and -whamr-onnx, 62 to 84 dB SI-SNR from SpeechBrain's
+  output). The plugin's `sepformer` kind stays for checkpoints of your own and `bolo-torch separate`. Re-measured
+  here: RTF 1.8 (16 kHz) and 0.9 (8 kHz) on 2 threads; trained on noisy, reverberant mixtures, they did least of the
+  SepFormers on bolo's clean synthetic mixes (models.md, "Overlapping speech").
 - **MetricGAN+ is labelled for listening, not for use before transcription** (`features: [listening-only]`): it
   raised both recognisers' word error rates in bolo's test, so `denoise=true` / `auto` and a pipeline `denoise`
   step without a model never put it in front of speech recognition, even when it is `default_denoise` (the shipped

@@ -21,8 +21,6 @@ the console, the OpenAI-compatible API) works as for bolo's own engines.
 | `svara-tts-v1` | TTS | Kenpath Svara v1, 3B Llama + SNAC, 19 languages, 38 voices | `orpheus` | Apache-2.0 | no | **no** (only the SNAC decoder) |
 | `spark-tts-0.5b` | TTS | SparkAudio Spark-TTS 0.5B, English and Chinese, created voices (female, male) and voice cloning | `spark-tts` + the authors' BiCodec code (bundle `spark-tts`) | CC-BY-NC-SA-4.0 (non-commercial) | no | **no** (fakes; BiCodec code with random weights) |
 | `maskgct` | TTS | Amphion MaskGCT, voice cloning in English, Chinese, Japanese, Korean, French and German | `maskgct` + GPL front-end packages + the authors' code (bundle `maskgct`) | CC-BY-NC-4.0 (non-commercial) | no | **no** (fakes; the authors' pipeline with tiny random networks) |
-| `sepformer-whamr16k` | separation | SpeechBrain SepFormer, WHAMR!, 16 kHz, 2 speakers | `sepformer` | Apache-2.0 (WSJ0 data, see below) | no | CPU, see below |
-| `sepformer-whamr` | separation | SpeechBrain SepFormer, WHAMR!, 8 kHz, 2 speakers | `sepformer` | Apache-2.0 (WSJ0 data, see below) | no | CPU, see below |
 | `slu-slurp-hubert` | intent | SpeechBrain direct SLU for SLURP: HuBERT base + attentional decoder, the intent and slots of one English command (op `intent`) | `slu` | Apache-2.0 (SLURP data CC-BY-4.0) | no | CPU, see below |
 | `pixit-ami` | separation | pyannote PixIT `speech-separation-ami-1.0`, diarization + separation | `pyannote` | MIT | yes (two repositories) | CPU, see below |
 | `pyannote-speaker-diarization-3.1` | diarization | pyannote `speaker-diarization-3.1`, the original PyTorch pipeline | `pyannote` | MIT (pipeline, segmentation) + CC-BY-4.0 (WeSpeaker embedding, PLDA files) | yes (three repositories) | CPU, see below |
@@ -45,7 +43,9 @@ the console, the OpenAI-compatible API) works as for bolo's own engines.
 
 The separation models are bolo `separation` models in "blind" mode: bolo uses them for `separate_overlaps=true`
 on diarized transcription and on `POST /api/v1/diarize`, and assigns their tracks to its own diarized speakers.
-They can also be run without bolo: `bolo-torch separate mix.wav -m sepformer-whamr16k -o out/`.
+The SepFormer catalog entries (WHAMR!, WSJ0-mix, LibriMix) now run in ONNX Runtime in bolo itself, without PyTorch;
+the plugin's `sepformer` kind still loads a SepFormer checkpoint for an entry of your own, and the WHAMR! ones can
+be run without bolo: `bolo-torch separate mix.wav -m sepformer-whamr16k -o out/`.
 
 The pyannote diarizers are bolo `diarization` models: `POST /api/v1/diarize` with `model=pyannote-speaker-diarization-3.1`
 (or `-community-1`), or `diarization_model=...` with `diarize=true` / `response_format=diarized_json` on
@@ -648,7 +648,7 @@ All outputs were transcribed back with faster-whisper-tiny (English) or faster-w
 input text, with small errors ("ताज़ा जाएंगी" for "बाज़ार जाएँगे" once). On CPU these models are far slower than
 real time; IndicF5 and Indic Parler-TTS are GPU models in practice.
 
-Separation of a synthetic two-voice mix (bolo's samples `en-long.wav` + `hi-short.wav` overlapping from 6.0 s at
+Separation of a synthetic two-voice mix, measured when the SepFormers ran on this plugin (bolo's samples `en-long.wav` + `hi-short.wav` overlapping from 6.0 s at
 0 dB, 11.8 s; scored by SI-SDR over the overlap, permutation-invariant):
 
 | Model | Load | Separate 11.8 s | RTF | Female voice | Male voice |

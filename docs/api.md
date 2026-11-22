@@ -2437,7 +2437,7 @@ measured results by type of audio. It is off by default. A blind separator can b
 well: SpeechBrain's SepFormers in ONNX Runtime (`sepformer-wsj02mix`,
 `sepformer-libri2mix` for two voices, `sepformer-wsj03mix`,
 `sepformer-libri3mix` for three, all 8 kHz models), or one in an engine plugin
-(`sepformer-whamr16k`, `pixit-ami`). Its tracks are given to the diarized
+(`pixit-ami`); the WHAMR! SepFormers (`sepformer-whamr16k`, `sepformer-whamr`) also run in ONNX Runtime. Its tracks are given to the diarized
 speakers by voice similarity, so a window where three people talk at once gets
 three tracks from a three-speaker model.
 

@@ -90,7 +90,8 @@ def test_stft_round_trip_and_masks() -> None:
 
 def test_catalog_entries() -> None:
     catalog = Catalog.load(None)
-    for name, speakers in (("sepformer-wsj02mix", 2), ("sepformer-wsj03mix", 3)):
+    for name, speakers in (("sepformer-wsj02mix", 2), ("sepformer-wsj03mix", 3), ("sepformer-whamr", 2),
+                           ("sepformer-whamr16k", 2)):  # fmt: skip
         spec = catalog.resolve(name)
         assert spec is not None and spec.engine == "onnxruntime" and spec.kind == "sepformer_onnx"
         assert spec.task == "separation" and spec.options["speakers"] == speakers

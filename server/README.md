@@ -221,7 +221,6 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TTS | Svara | 1 | as, bho, bn, brx, doi, en, gu, hi +11 | 0 | - |
 | STT | SraVaani | 1 | as, bn, en, gu, hi, kn, ml, mr +6 | 0 | - |
 | STT | IndicConformer | 27 | as, bn, brx, doi, gu, hi, kn, kok +14 | 20 | 0.060 (`indicconformer-ta-community`) |
-| SEPARATION | SepFormer | 6 | en | 6 | 1.440 (`sepformer-whamr`) |
 | SEPARATION | PixIT | 1 | en | 1 | 5.690 (`pixit-ami`) |
 | DIARIZATION | pyannote (PyTorch) | 3 | - | 3 | 0.876 (`pyannote-speaker-diarization-community-1`) |
 | STT | Reverb | 1 | en | 1 | 0.050 (`reverb-asr`) |
@@ -242,6 +241,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | PUNCTUATION | CT-Transformer | 1 | en, zh | 1 | 0.002 (`punct-zh-en-ct-transformer`) |
 | TTS | LFM3-Audio 2B | 1 | ar, da, de, el, en, es, fi, fr +10 | 0 | - |
 | SEPARATION | VoxLock | 1 | en | 1 | 0.460 (`voxlock-int8`) |
+| SEPARATION | SepFormer | 6 | en | 6 | 0.913 (`sepformer-whamr`) |
 | SPEAKER-EMBEDDING | ERes2Net | 1 | - | 1 | 0.259 (`eres2net-voxceleb`) |
 | SPEAKER-EMBEDDING | CAM++ | 3 | - | 3 | 0.116 (`wespeaker-campplus-voxceleb`) |
 | SPEAKER-EMBEDDING | WeSpeaker ResNet | 1 | - | 1 | 0.126 (`wespeaker-resnet34-voxceleb`) |

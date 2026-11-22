@@ -138,7 +138,7 @@ def test_catalog_entries_use_kinds_the_plugin_knows() -> None:
         assert "bolo-torch" in str(spec.options.get("plugin_install", "")), spec.id
     assert TorchEngine().kinds == tuple(LOADERS)
     seps = {s.id for s in entries if s.task == "separation"}
-    assert {"sepformer-whamr16k", "sepformer-whamr", "pixit-ami"} <= seps
+    assert "pixit-ami" in seps and not {"sepformer-whamr16k", "sepformer-whamr"} & seps  # SepFormer: ONNX in core
     diarizers = {s.id: s for s in entries if s.task == "diarization" and s.kind == "pyannote-diarization"}
     assert set(diarizers) == {
         "pyannote-speaker-diarization-3.1", "pyannote-speaker-diarization-community-1", "reverb-diarization-v2-torch",

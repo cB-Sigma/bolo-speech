@@ -919,17 +919,6 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 ### Overlapped-speech separation
 
-#### SepFormer
-
-| id | languages | tier | streaming | download | licence | validated |
-| --- | --- | --- | --- | --- | --- | --- |
-| `sepformer-whamr16k` | en | accuracy | - | 113 MB | Apache-2.0 · needs plugin torch | **CPU** · RTF 3.690 |
-| `sepformer-whamr` | en | balanced | - | 113 MB | Apache-2.0 · needs plugin torch | **CPU** · RTF 1.440 |
-| `sepformer-wsj02mix` | en | balanced | - | 106 MB | Apache-2.0 | **CPU** · RTF 3.507 |
-| `sepformer-wsj03mix` | en | balanced | - | 106 MB | Apache-2.0 | **CPU** · RTF 3.597 |
-| `sepformer-libri2mix` | en | accuracy | - | 106 MB | Apache-2.0 | **CPU** · RTF 1.860 |
-| `sepformer-libri3mix` | en | accuracy | - | 106 MB | Apache-2.0 | **CPU** · RTF 3.823 |
-
 #### PixIT
 
 | id | languages | tier | streaming | download | licence | validated |
@@ -941,6 +930,17 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `voxlock-int8` | en | balanced | - | 81 MB | Apache-2.0 | **CPU** · RTF 0.460 |
+
+#### SepFormer
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `sepformer-wsj02mix` | en | balanced | - | 106 MB | Apache-2.0 | **CPU** · RTF 3.507 |
+| `sepformer-wsj03mix` | en | balanced | - | 106 MB | Apache-2.0 | **CPU** · RTF 3.597 |
+| `sepformer-libri2mix` | en | accuracy | - | 106 MB | Apache-2.0 | **CPU** · RTF 1.860 |
+| `sepformer-libri3mix` | en | accuracy | - | 106 MB | Apache-2.0 | **CPU** · RTF 3.823 |
+| `sepformer-whamr16k` | en | accuracy | - | 106 MB | Apache-2.0 | **CPU** · RTF 1.766 |
+| `sepformer-whamr` | en | balanced | - | 106 MB | Apache-2.0 | **CPU** · RTF 0.913 |
 
 ### Denoising
 
@@ -2404,7 +2404,7 @@ share of the speakers' solo speech in the window. Measured here through bolo:
 | separator | mixes (16 kHz English, 0 dB) | cpWER without → with | relative (95 % CI) | overlap WER | worst mix | extra RTF |
 | --- | --- | --- | --- | --- | --- | --- |
 | `voxlock-int8` (sherpa-onnx) | 36 | 32.8 % → 26.2 % | -20 % (-11 to -34 %) | 38.0 % → 27.9 % | +0.9 pt | 0.26 |
-| `sepformer-whamr16k` (bolo-torch, CPU PyTorch) | 36 | 32.8 % → 26.2 % | -20 % (-11 to -34 %) | 38.0 % → 28.0 % | **+8.7 pt** | 0.82 |
+| `sepformer-whamr16k` (then on bolo-torch, CPU PyTorch) | 36 | 32.8 % → 26.2 % | -20 % (-11 to -34 %) | 38.0 % → 28.0 % | **+8.7 pt** | 0.82 |
 | `pixit-ami` (bolo-torch, gated), pipeline defaults ¹ | 36 | 30.4 % → 26.7 % | -12 % (-4 to -23 %) | 34.1 % → 28.1 % | +6.8 pt | 1.44 |
 | `pixit-ami`, leakage removal off, 2 speakers ¹ | 36 | 30.4 % → 25.8 % | -15 % (-6 to -26 %) | 34.1 % → 26.7 % | +5.8 pt | 1.85 |
 
@@ -2454,9 +2454,14 @@ to 15):
 | `sepformer-libri2mix` | 2 | 20.6 dB | +9.6 | +12.1 | +10.8 | +2.0 | 1.9 |
 | `sepformer-wsj03mix` | 3 | 19.8 dB | +6.3 | +7.6 | -1.3 | +2.7 | 3.6 |
 | `sepformer-libri3mix` | 3 | 19.0 dB | +5.9 | +11.1 | +7.8 | +12.0 | 3.8 |
+| `sepformer-whamr` | 2 | 13.7 dB | +1.8 | +3.1 | +3.0 | -2.9 | 0.9 |
+| `sepformer-whamr16k` | 2 | 13.5 dB | -2.9 | +3.9 | -0.9 | -1.7 | 1.8 |
 
 A two-voice model given three voices returns two tracks (scored against the
-best two voices). The LibriMix models did much better on these voices than
+best two voices). The WHAMR! models (trained on noisy, reverberant mixtures;
+the 16 kHz one scored against full-band references) did least on these clean
+mixes; they moved here from the PyTorch plugin, where they had measured the
+same way (plugins/bolo-torch/README.md). The LibriMix models did much better on these voices than
 the WSJ0 ones, and `sepformer-libri3mix` is the only one that separated
 three voices usefully (+12 dB). Synthetic speech from one TTS engine is not a
 recording: this says which model to try first, not what it does on your

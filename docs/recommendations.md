@@ -220,7 +220,7 @@ written by `server/tools/gen_docs.py` from the catalog, with the heuristic
 speed factor (no benchmark) and every engine taken as installed:
 
 <!-- BEGIN GENERATED: example-machines -->
-**The reference machine: 4 x86-64 cores with AVX-512 and AMX, 16 GB, no GPU** (speed factor 1.00; of 598 entries: 292 comfortable, 101 usable, 109 slow, 62 unlikely to fit, 34 cloud)
+**The reference machine: 4 x86-64 cores with AVX-512 and AMX, 16 GB, no GPU** (speed factor 1.00; of 598 entries: 292 comfortable, 102 usable, 108 slow, 62 unlikely to fit, 34 cloud)
 
 | For | Default pick | Fit | Expected RTF (range) | Basis |
 | --- | --- | --- | --- | --- |
