@@ -15,7 +15,10 @@ mypy
 pytest -q                                              # about 90 seconds, needs no model and no network
 ```
 
-The suite uses a deterministic fake engine, so it runs anywhere. The tests
+The suite uses a deterministic fake engine, so it runs anywhere. Its time
+limits are set in one place each (`server/tests/conftest.py`,
+`ui/vitest.config.ts`); on a slow or heavily shared machine,
+`BOLO_TEST_TIMEOUT_SCALE=2` doubles them for both suites. The tests
 that download and run real models are opt-in:
 
 ```bash
