@@ -73,6 +73,9 @@ jobs:
     name: server on macOS (Apple Silicon, Python 3.12)
     runs-on: macos-15
     timeout-minutes: 90
+    env:
+      # slower runners: test waits and HTTP timeouts doubled (server/tests/conftest.py, ui/vitest.config.ts)
+      BOLO_TEST_TIMEOUT_SCALE: "2"
     defaults:
       run:
         working-directory: server
@@ -191,6 +194,9 @@ jobs:
       run:
         working-directory: server
         shell: bash
+    env:
+      # slower runners: test waits and HTTP timeouts doubled (server/tests/conftest.py, ui/vitest.config.ts)
+      BOLO_TEST_TIMEOUT_SCALE: "2"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
