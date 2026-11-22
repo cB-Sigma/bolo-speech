@@ -221,6 +221,36 @@ def test_espeak_executable_route(tmp_path, monkeypatch) -> None:  # type: ignore
         phonemize.reset_phonemizer()
 
 
+async def test_the_catalog_asks_espeak_ng_its_version_once(tmp_path, monkeypatch, settings) -> None:  # type: ignore[no-untyped-def]
+    """The catalog reports the phonemiser for every model that needs one: it started a process per model (hundreds),
+    which made each request take seconds and, on a busy machine, longer than a client waits."""
+    from bolo.core import Bolo
+    from bolo.text import phonemize
+    from fakebin import fake_program
+
+    calls = tmp_path / "calls"
+    fake_program(
+        tmp_path / "bin" / "espeak-ng",
+        f"import sys\nwith open({str(calls)!r}, 'a') as f:\n    f.write(' '.join(sys.argv[1:]) + '\\n')\n"
+        "sys.stdout.write('eSpeak NG text-to-speech: 1.51  Data at: /x\\n')\n",
+    )
+    monkeypatch.setenv("PATH", str(tmp_path / "bin"))
+    monkeypatch.setenv("BOLO_ESPEAK", "executable")
+    phonemize.reset_phonemizer()
+    core = Bolo(settings)
+    await core.start()
+    try:
+        for _ in range(2):
+            models = core.catalog_api()
+        assert len(models) > 100
+        espeak = core.components.status()
+        assert any(c["id"] == "espeak-ng" and c["version"] == "1.51" for c in espeak)
+        assert calls.read_text(encoding="utf-8").splitlines() == ["--version"]
+    finally:
+        await core.stop()
+        phonemize.reset_phonemizer()
+
+
 # -- training-time cleaning of character voices (the same front end as the in-browser voices) ---------------
 _UI_FIXTURES = (
     Path(__file__).resolve().parents[2] / "ui" / "src" / "lib" / "browser-tts" / "fixtures" / "sherpa-tokens.json"

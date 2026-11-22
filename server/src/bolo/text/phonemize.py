@@ -211,13 +211,21 @@ class EspeakExecutable(Phonemizer):
 
     def __init__(self, exe: str) -> None:
         self.exe = exe
+        self._version: tuple[str | None] | None = None
 
     def version(self) -> str | None:
+        """Asked of the program once: the catalog asks for every model that phonemises, and a process per model made
+        each catalog request take seconds (longer on a busy machine) while it held up the server."""
+        if self._version is None:
+            self._version = (self._ask_version(),)
+        return self._version[0]
+
+    def _ask_version(self) -> str | None:
         try:
             out = subprocess.run([self.exe, "--version"], capture_output=True, check=False, timeout=10).stdout
             m = re.search(r"(\d+\.\d+(?:\.\d+)?)", out.decode(errors="replace"))
             return m.group(1) if m else None
-        except OSError:
+        except (OSError, subprocess.TimeoutExpired):
             return None
 
     @lru_cache(maxsize=4096)  # noqa: B019 - one instance per process

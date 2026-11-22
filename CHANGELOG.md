@@ -49,6 +49,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   default, `gtcrn-simple`, is used instead and the log says so); naming it still uses it. `bolo recommend` lists it
   last among denoisers.
 
+### Fixed
+
+- **The catalog answers in a tenth of a second, not two.** `GET /api/v1/catalog` (the console's Models page)
+  asked the `espeak-ng` program for its version once per model that phonemises, several hundred processes per
+  request, on the server's event loop; on a busy machine that took longer than clients wait and held up every other
+  request meanwhile. The version is now asked once per process.
+
 ## [1.0.1] - 2026-11-21
 
 ### Added
