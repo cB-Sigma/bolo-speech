@@ -7,6 +7,8 @@ writes them to ``<data_dir>/custom.yaml``.
 
 from __future__ import annotations
 
+import copy
+import functools
 import re
 import threading
 from dataclasses import dataclass, field
@@ -479,8 +481,12 @@ FAKE_MODELS: list[dict[str, Any]] = [
 ]  # fmt: skip
 
 
+#: libyaml's parser when PyYAML has it (its wheels do), ten times faster than the pure-Python one on the catalog
+_YAML_LOADER: type[yaml.SafeLoader] = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+
+
 def _load_yaml_entries(text: str, origin: str) -> list[dict[str, Any]]:
-    doc = yaml.safe_load(text) or []
+    doc = yaml.load(text, Loader=_YAML_LOADER) or []  # a safe loader (C or Python)
     if isinstance(doc, dict):
         doc = doc.get("models", [])
     if not isinstance(doc, list):
@@ -488,13 +494,20 @@ def _load_yaml_entries(text: str, origin: str) -> list[dict[str, Any]]:
     return doc
 
 
-def packaged_entries() -> list[dict[str, Any]]:
+@functools.cache
+def _packaged() -> tuple[dict[str, Any], ...]:
     entries: list[dict[str, Any]] = []
     root = resources.files("bolo.catalog")
     for item in sorted(root.iterdir(), key=lambda p: p.name):
         if item.name.endswith(".yaml"):
             entries.extend(_load_yaml_entries(item.read_text(encoding="utf-8"), item.name))
-    return entries
+    return tuple(entries)
+
+
+def packaged_entries() -> list[dict[str, Any]]:
+    """The catalog files that come with bolo, read once per process (they do not change while it runs); each caller
+    gets its own copy."""
+    return copy.deepcopy(list(_packaged()))
 
 
 class Catalog:

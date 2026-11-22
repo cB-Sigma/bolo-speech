@@ -55,6 +55,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   asked the `espeak-ng` program for its version once per model that phonemises, several hundred processes per
   request, on the server's event loop; on a busy machine that took longer than clients wait and held up every other
   request meanwhile. The version is now asked once per process.
+- **A server starts faster.** The catalog files that come with bolo are parsed with libyaml when PyYAML has it (its
+  wheels do) and once per process: 1.7 s less on a 4-vCPU machine for each server start and each `bolo` command
+  that reads the catalog.
 
 ## [1.0.1] - 2026-11-21
 

@@ -218,6 +218,34 @@ def test_helpers() -> None:
 
 
 # -- catalog --------------------------------------------------------------
+def test_the_packaged_catalog_is_parsed_once_with_libyaml(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every server (and every test's server) loads the catalog: parsed with PyYAML's pure-Python loader each time,
+    that took 1.7 s, and on a busy machine longer than the tests waited for a server to start."""
+    import yaml
+
+    from bolo import catalog
+
+    assert not yaml.__with_libyaml__ or catalog._YAML_LOADER is yaml.CSafeLoader
+    parsed: list[int] = []
+
+    class Counting(catalog._YAML_LOADER):  # type: ignore[name-defined,misc]
+        def __init__(self, stream: str) -> None:
+            parsed.append(1)
+            super().__init__(stream)
+
+    monkeypatch.setattr(catalog, "_YAML_LOADER", Counting)
+    catalog._packaged.cache_clear()
+    try:
+        first = packaged_entries()
+        files = len(parsed)
+        assert files > 10 and len(Catalog.load()) == len(first)
+        first[0]["id"] = "changed by a caller"  # each caller has its own copy
+        assert packaged_entries()[0]["id"] != "changed by a caller"
+        assert len(parsed) == files
+    finally:
+        catalog._packaged.cache_clear()
+
+
 def test_every_packaged_entry_is_well_formed() -> None:
     entries = packaged_entries()
     assert len(entries) >= 150
