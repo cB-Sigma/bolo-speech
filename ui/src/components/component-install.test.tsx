@@ -120,7 +120,7 @@ describe('ComponentNotice and ComponentsCard', () => {
     )
     expect((await espeak()).installed).toBe(false)
     await userEvent.click(screen.getByRole('button', { name: /Accept the licence and install/ }))
-    await waitFor(async () => expect((await espeak()).installed).toBe(true), { timeout: 5000 })
+    await waitFor(async () => expect((await espeak()).installed).toBe(true))
   })
 
   it('shows the reason and the manual command when the server cannot install', async () => {
@@ -207,9 +207,8 @@ describe('language packs', () => {
     localStorage.setItem('bolo.languagePacks.open', '1')
     wrap(<ComponentsCard />)
     await userEvent.click(await screen.findByTestId('install-needed-packs'))
-    await waitFor(
-      () => expect(screen.getByTestId('language-packs-summary')).toHaveTextContent('4 of 35 installed · 3 needed'),
-      { timeout: 10_000 },
+    await waitFor(() =>
+      expect(screen.getByTestId('language-packs-summary')).toHaveTextContent('4 of 35 installed · 3 needed'),
     )
     expect(screen.getByTestId('language-packs-summary')).not.toHaveTextContent('missing')
     expect(screen.queryByTestId('install-needed-packs')).not.toBeInTheDocument()

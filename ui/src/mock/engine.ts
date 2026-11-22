@@ -26,6 +26,17 @@ import { seedCatalog, type HintSegment } from './catalog'
 import { applyFits, mockHardware, mockSetup, mockWarnings } from './hardware'
 import { MockTelephony } from './telephony'
 
+/**
+ * How long the mock server's simulated waits last, as a share of the times written in it (1: as written). The
+ * waits stand in for a real server's work (latency, loading a model, a pull's progress); the console's tests set
+ * 0 in src/test/setup.ts, so a test does not wait on them against its time limits (longer on a busy machine).
+ * Events keep their order.
+ */
+let latencyScale = 1
+export function setMockLatency(scale: number): void {
+  latencyScale = scale
+}
+
 /** Deterministic PRNG so screenshots and tests are repeatable. */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0
@@ -203,7 +214,7 @@ export class MockServer {
     const id = setTimeout(() => {
       this.pendingTimeouts.delete(id)
       fn()
-    }, ms)
+    }, ms * latencyScale)
     this.pendingTimeouts.add(id)
   }
 
@@ -926,7 +937,7 @@ const PREVIEWS = [
 
 const round3 = (v: number) => Math.round(v * 1000) / 1000
 const round1 = (v: number) => Math.round(v * 10) / 10
-export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms * latencyScale))
 
 export class HttpError extends Error {
   readonly status: number
