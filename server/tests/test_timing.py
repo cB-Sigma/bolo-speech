@@ -82,7 +82,11 @@ async def test_stt_queue_phase_measures_waiting_behind_another_request(core: Bol
     assert phase(t2, "queue") == pytest.approx(ms(start2 - arrived), abs=TOL)
     assert phase(t2, "decode") == pytest.approx(ms(end2 - start2), abs=TOL)
     assert t2.total_ms == pytest.approx(ms(end2 - arrived), abs=TOL + 20)
-    assert core.stats()["models"][0]["queue"]["queue_ms"]["p95"] > 200
+    # the stats record that wait: their p95 is this request's queue phase (the first one waited for nothing). How long
+    # that is depends on how soon the second request got going on the runner, so it is compared, not fixed
+    waited = phase(t2, "queue")
+    assert waited > 50
+    assert core.stats()["models"][0]["queue"]["queue_ms"]["p95"] == pytest.approx(waited, abs=TOL)
 
 
 async def test_stt_batched_requests_share_one_engine_call(core: Bolo) -> None:
