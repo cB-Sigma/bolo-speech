@@ -256,3 +256,22 @@ def test_http_denoise_route(dn_live: LiveServer) -> None:
         timeout=30,
     )  # fmt: skip
     assert r.status_code == 200 and len(r.content) == 2 * len(x)
+
+
+def test_auto_never_puts_a_listening_only_denoiser_before_recognition() -> None:
+    """MetricGAN+ raises recognisers' error rates: as the server's default it is replaced by the shipped default in
+    front of speech recognition (denoise=true/auto, the pipeline step without a model); named, it is used."""
+    from bolo.config import Settings
+    from bolo.core import Bolo
+
+    core = Bolo(Settings(default_denoise="metricgan-plus", fake_engine=True))
+    assert "listening-only" in core.catalog.resolve("metricgan-plus").features  # type: ignore[union-attr]
+    for name in (None, "auto", "default"):
+        assert core.denoiser_before_stt(name).id == Settings.default_denoise
+    assert core.denoiser_before_stt("metricgan-plus").id == "metricgan-plus"
+    stt = core.catalog.resolve("fake-stt")
+    assert stt is not None
+    plan = core.denoise_plan(stt, DenoiseOptions())
+    assert plan is not None and plan.model == Settings.default_denoise
+    plan = core.denoise_plan(stt, DenoiseOptions(model="metricgan-plus"))
+    assert plan is not None and plan.model == "metricgan-plus"

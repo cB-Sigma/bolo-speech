@@ -35,6 +35,14 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   (models.md, "Every denoiser compared"): SepFormer DNS4 helped Whisper at strength 0.5 (17.2% to 11.2% WER) but
   needs 3.8 s of CPU per second of audio; MetricGAN+ (7.6 MB, the cheapest) hurt both recognisers at full strength.
 
+### Changed
+
+- **MetricGAN+ is labelled for listening, not for use before transcription** (`features: [listening-only]`): it
+  raised both recognisers' word error rates in bolo's test, so `denoise=true` / `auto` and a pipeline `denoise`
+  step without a model never put it in front of speech recognition, even when it is `default_denoise` (the shipped
+  default, `gtcrn-simple`, is used instead and the log says so); naming it still uses it. `bolo recommend` lists it
+  last among denoisers.
+
 ## [1.0.1] - 2026-11-21
 
 ### Added

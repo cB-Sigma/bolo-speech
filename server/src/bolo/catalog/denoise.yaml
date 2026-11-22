@@ -669,12 +669,15 @@
   size_bytes: 7588879
   license: Apache-2.0
   license_url: https://huggingface.co/speechbrain/metricgan-plus-voicebank
-  description: 'SpeechBrain MetricGAN+ (Fu et al., Interspeech 2021): a bidirectional LSTM that masks the log
-    magnitude spectrum, trained on VoiceBank-DEMAND (University of Edinburgh, CC BY 4.0; read English speech with
-    recorded noise) to maximise PESQ. SpeechBrain reports PESQ 3.15, STOI 93.0 on its test set. 7.6 MB, in ONNX
-    Runtime without PyTorch (codebucketsolutions/metricgan-plus-voicebank-onnx; the STFT runs in NumPy, as in
-    SpeechBrain, without its final peak normalisation). Non-causal: a live stream enhances each piece with the half
-    second before it. Weights Apache-2.0.'
+  features: [listening-only]
+  description: 'FOR LISTENING, NOT BEFORE TRANSCRIPTION: in bolo''s test it raised recognisers'' word error rates
+    sharply (models.md, "Every denoiser compared"), so denoise=auto never puts it in front of speech recognition
+    (a request must name it). SpeechBrain MetricGAN+ (Fu et al., Interspeech 2021): a bidirectional LSTM that masks
+    the log magnitude spectrum, trained on VoiceBank-DEMAND (University of Edinburgh, CC BY 4.0; read English speech
+    with recorded noise) to maximise PESQ, a listening-quality score. SpeechBrain reports PESQ 3.15, STOI 93.0 on its
+    test set. 7.6 MB, in ONNX Runtime without PyTorch (codebucketsolutions/metricgan-plus-voicebank-onnx; the STFT
+    runs in NumPy, as in SpeechBrain, without its final peak normalisation). Non-causal: a live stream enhances each
+    piece with the half second before it. Weights Apache-2.0.'
   source_url: https://huggingface.co/speechbrain/metricgan-plus-voicebank
   validated: cpu
   measured:

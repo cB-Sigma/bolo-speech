@@ -733,6 +733,8 @@ def _poor_voice(spec: ModelSpec) -> bool:
     that did little for recognisers in theirs (:data:`POOR_DENOISE_RATIO`). Such models are listed after the others."""
     m = spec.measured or {}
     if spec.task == "denoise":
+        if "listening-only" in spec.features:  # it makes recognisers worse (MetricGAN+)
+            return True
         ratio = m.get("wer_ratio")
         return isinstance(ratio, (int, float)) and ratio > POOR_DENOISE_RATIO
     if spec.task != "tts":

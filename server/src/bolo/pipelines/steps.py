@@ -59,7 +59,7 @@ async def _denoise(r: Runner, run: Run, e: Entry, i: Inputs, o: Options, scope: 
     from bolo.denoise import enhance, mix
 
     audio = need_audio(i)
-    model = r.core.resolve(e["model"], "denoise").id
+    model = r.core.denoiser_before_stt(e["model"]).id
     strength = number(_opt(r, run, o, "strength", scope), "strength")
     if strength is not None and not 0.0 < strength <= 1.0:
         raise InvalidRequest("strength must be above 0 and at most 1")

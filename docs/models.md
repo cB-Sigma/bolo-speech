@@ -2768,7 +2768,10 @@ What it shows, on this small synthetic test:
   table after `demucs-valentini-nc` (3.8 s of CPU per second of audio; a live stream cannot keep up).
   **MetricGAN+** (`metricgan-plus`, Apache-2.0, 7.6 MB, the cheapest in CPU time here) was trained to
   please PESQ on VoiceBank-DEMAND and hurt both recognisers badly at full strength (Moonshine 61.9%, Whisper
-  49.3%); at 0.5 it did nothing for them. Both are SpeechBrain checkpoints exported unchanged to ONNX
+  49.3%); at 0.5 it did nothing for them. It is labelled for listening, not for use before transcription
+  (`features: [listening-only]`): `denoise=true` or `auto` never puts it in front of a recogniser, even when it is
+  `default_denoise` (the shipped default, `gtcrn-simple`, is used instead, with a warning in the log); a request,
+  a model pin or a pipeline step that names it gets it. Both are SpeechBrain checkpoints exported unchanged to ONNX
   (`server/tools/export_speechbrain_onnx.py`, published under codebucketsolutions/ with parity checks: SepFormer
   52 to 90 dB SI-SNR from SpeechBrain's output, MetricGAN+ about 130 dB). Measured 2026-11-21, load average 6 to 12.
 * The **Demucs** denoiser (PyTorch, non-commercial) did no better than the

@@ -818,6 +818,8 @@ in a request or as `default_denoise`, and is pulled like any other model
 | DeepFilterNet 3 | `deepfilternet3` | MIT or Apache-2.0 | onnxruntime (`pip install onnxruntime`) | 48 kHz |
 | RNNoise | `rnnoise` | BSD-3-Clause | its own C library (downloaded per platform) | 48 kHz |
 | Demucs denoiser | `demucs-dns48`, `demucs-dns64`, `demucs-master64`, `demucs-valentini-nc` | **CC-BY-NC-4.0** (not for commercial use) | PyTorch, bolo-torch plugin | 16 kHz |
+| SepFormer DNS4 | `sepformer-dns4-16k` | Apache-2.0 | onnxruntime | 16 kHz |
+| MetricGAN+ | `metricgan-plus` (**for listening only**: it raises recognition errors, so `denoise=true`/`auto` never uses it before a recogniser, even as `default_denoise`; name it to use it) | Apache-2.0 | onnxruntime | 16 kHz |
 | ElevenLabs Voice Isolator | `elevenlabs-voice-isolator` | provider's terms (paid cloud API) | ElevenLabs | 16 kHz up |
 
 Denoisers that were looked at and cannot run yet (ClearVoice, Resemble

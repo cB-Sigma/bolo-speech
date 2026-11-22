@@ -1632,6 +1632,20 @@ class Bolo:
     # ------------------------------------------------------------------
     # speech to text
     # ------------------------------------------------------------------
+    def denoiser_before_stt(self, name: str | None) -> ModelSpec:
+        """The denoiser ``name`` names for use in front of a recogniser. Left to the server (no name, ``default``,
+        ``auto``), a denoiser marked ``listening-only`` (it makes recognisers worse: MetricGAN+) is never chosen: the
+        shipped default is used instead, and the substitution is logged. Named explicitly, it is used as asked."""
+        spec = self.resolve(name, "denoise")
+        if (not name or name in ("default", "auto")) and "listening-only" in spec.features:
+            fallback = self.resolve(Settings.default_denoise, "denoise")  # the shipped default
+            log.warning(
+                "default_denoise '%s' is for listening and raises recognition errors; '%s' is used in front of "
+                "speech recognition instead (name it explicitly to use it anyway)", spec.id, fallback.id,
+            )  # fmt: skip
+            return fallback
+        return spec
+
     def denoise_plan(self, spec: ModelSpec, requested: DenoiseOptions | None) -> DenoiseOptions | None:
         """The denoiser to run before ``spec`` hears the audio (model resolved), or None.
 
@@ -1656,7 +1670,7 @@ class Bolo:
         if opts is None or not opts.enabled or opts.strength <= 0:
             return None
         try:
-            model = self.resolve(opts.model, "denoise")
+            model = self.denoiser_before_stt(opts.model)
         except BoloError as exc:
             if source == "request":
                 if exc.param in (None, "model"):
