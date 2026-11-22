@@ -739,7 +739,9 @@ def test_a_wrong_key_and_a_timeout(settings: Settings, cloud: FakeProviders, cap
     with_providers(settings, cloud)
     wrong = "not-a-real-key-0123456789"
     settings.providers["openai"]["api_key"] = wrong
-    settings.provider_timeout_s = 0.5
+    # the short limit is Sarvam's alone: the other requests here keep the default, so that on a busy machine a
+    # quick answer (the 401) is not mistaken for a timeout
+    settings.providers["sarvam"]["options"] = {"timeout_s": 0.5}
     server = LiveServer(settings)
     server.start()
     try:
@@ -747,7 +749,7 @@ def test_a_wrong_key_and_a_timeout(settings: Settings, cloud: FakeProviders, cap
             r = transcribe(server, "openai-whisper-1")
             assert r.status_code == 502 and r.json()["error"]["code"] == "provider_auth"
             assert wrong not in r.text and "refused bolo's API key (401)" in r.text
-            cloud.delay_s = 1.2
+            cloud.delay_s = 2.0
             r = transcribe(server, "sarvam-saaras-v4")
             assert r.status_code == 504 and r.json()["error"]["code"] == "provider_timeout"
             cloud.delay_s = 0.0
