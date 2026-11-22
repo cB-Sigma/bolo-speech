@@ -9,7 +9,7 @@ import socketserver
 import sys
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import httpx
@@ -43,6 +43,16 @@ TIMEOUT_SCALE = float(os.environ.get("BOLO_TEST_TIMEOUT_SCALE") or 1) or 1.0
 WAIT_S = 60.0 * TIMEOUT_SCALE
 #: a test's HTTP requests to the servers it starts; httpx's own default (5 s) is too short on a busy machine
 HTTP_TIMEOUT = httpx.Timeout(30.0 * TIMEOUT_SCALE)
+
+
+def wait_until(condition: Callable[[], object], what: str, seconds: float | None = None) -> None:
+    """Poll ``condition`` until it is true; fail naming ``what`` after ``seconds`` (WAIT_S by default). For a
+    test that waits for something the code under test does in another thread, instead of sleeping a fixed time."""
+    deadline = time.monotonic() + (WAIT_S if seconds is None else seconds)
+    while not condition():
+        if time.monotonic() > deadline:
+            raise AssertionError(f"timed out waiting until {what}")
+        time.sleep(0.01)
 
 
 def _with_test_timeout(call: object) -> object:

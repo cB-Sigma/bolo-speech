@@ -25,7 +25,7 @@ from bolo.core import Bolo
 from bolo.engines.base import LoadOptions, SynthesisExtras
 from bolo.engines.tts_server import ServerProcess, ServerTTS, TTSServerEngine
 from bolo.errors import ComponentMissing, EngineUnavailable, InvalidRequest
-from conftest import LiveServer, wav_bytes
+from conftest import WAIT_S, LiveServer, wait_until, wav_bytes
 from fake_tts_server import FakeTTSServer
 from fakebin import fake_program, printing_program
 
@@ -259,14 +259,16 @@ def test_managed_llama_server_lifecycle(tmp_path: Path, monkeypatch: pytest.Monk
         assert "-mm" in proc.argv and "--api-key" in proc.argv and "127.0.0.1" in proc.argv
         out = np.concatenate(list(model.synthesize("Hello.", "male")))
         assert len(out) == int(16000 * 0.05 * 6)
-        # the process dies: the request fails as engine_unavailable, the next one waits for the back-off
+        # the process dies: the request fails as engine_unavailable, the next one waits for the back-off (made
+        # long here, so that a busy machine's pause between the two requests cannot outlast it)
+        proc._backoff = WAIT_S
         with pytest.raises(EngineUnavailable):
             list(model.synthesize("crash now"))
-        time.sleep(0.2)
+        wait_until(lambda: not proc.running, "the server process has exited")
         with pytest.raises(EngineUnavailable, match="restarting in"):
             list(model.synthesize("Hello."))
         assert proc.crashes == 1
-        time.sleep(1.1)
+        proc._not_before = time.monotonic()  # the back-off is over: the next request starts the server again
         out = np.concatenate(list(model.synthesize("Hello again.")))
         assert len(out) > 0 and proc.restarts == 1 and proc.running
     finally:

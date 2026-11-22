@@ -6,6 +6,7 @@ import base64
 import io
 import threading
 from collections.abc import Iterator
+from typing import Any
 
 import httpx
 import numpy as np
@@ -13,7 +14,7 @@ import openai
 import pytest
 
 from bolo.audio import decode_audio, mulaw_decode
-from conftest import WAIT_S, LiveServer, wav_bytes, wav_file
+from conftest import WAIT_S, LiveServer, wait_until, wav_bytes, wav_file
 
 
 @pytest.fixture
@@ -271,16 +272,25 @@ def test_auth_when_api_key_is_set(settings) -> None:  # type: ignore[no-untyped-
         srv.stop()
 
 
-def test_disconnected_client_does_not_occupy_the_engine(live: LiveServer) -> None:
-    """A queued transcription whose client hung up is dropped before it reaches the engine."""
+def test_disconnected_client_does_not_occupy_the_engine(live: LiveServer, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A queued transcription whose client hung up is dropped before it reaches the engine. Each step waits for
+    the server to reach the state the next one needs (no fixed sleeps): the first request is held in the engine
+    until the second one, queued behind it, has been given up."""
     import socket
-    import time
 
-    from conftest import wav_bytes
+    from bolo.engines.fake import FakeSTT
 
+    transcribe = FakeSTT.transcribe
+    decoding, release = threading.Event(), threading.Event()
+
+    def held(self: FakeSTT, requests: list[Any]) -> list[Any]:  # the first decode lasts until the test lets it end
+        decoding.set()
+        release.wait(WAIT_S)
+        return transcribe(self, requests)
+
+    monkeypatch.setattr(FakeSTT, "transcribe", held)  # before the load: the queue keeps the bound method
     httpx.post(live.url + "/api/v1/models/fake-stt/load")
     model = live.core.manager.loaded["fake-stt"].model
-    model.base_delay_s = 0.6  # type: ignore[attr-defined]
     model.max_batch = 1  # type: ignore[attr-defined]
     live.core.manager.loaded["fake-stt"].queue._max_batch = {"batch": 1}
     body = wav_bytes(1.0)
@@ -300,18 +310,23 @@ def test_disconnected_client_does_not_occupy_the_engine(live: LiveServer) -> Non
     ).encode() + payload
 
     def fire() -> socket.socket:
-        s = socket.create_connection(("127.0.0.1", live.port))
+        s = socket.create_connection(("127.0.0.1", live.port), timeout=WAIT_S)
         s.sendall(request)
         return s
 
-    first = fire()  # occupies the single worker for 0.6 s
-    time.sleep(0.15)
-    doomed = fire()  # queued behind it
-    time.sleep(0.15)
+    queue = live.core.manager.loaded["fake-stt"].queue
+    first = fire()
+    wait_until(decoding.is_set, "the first request is in the engine")
+    doomed = fire()
+    wait_until(lambda: queue.depth == 1, "the second request is queued behind it")
     doomed.close()  # hangs up while still queued
+    wait_until(lambda: queue.depth == 0 and queue.stats.cancelled == 1, "the queue drops the second request")
+    release.set()
     assert b"200 OK" in first.recv(65536)
     first.close()
-    time.sleep(0.5)
+
+    def statuses() -> list[str]:
+        return sorted(t["status"] for t in httpx.get(live.url + "/api/v1/requests").json()["requests"])
+
+    wait_until(lambda: statuses() == ["cancelled", "ok"], "both requests are recorded")
     assert model.calls == [1]  # type: ignore[attr-defined]  only the first request was ever decoded
-    statuses = sorted(t["status"] for t in httpx.get(live.url + "/api/v1/requests").json()["requests"])
-    assert statuses == ["cancelled", "ok"]
