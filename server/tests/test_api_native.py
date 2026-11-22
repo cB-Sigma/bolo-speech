@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from bolo import __version__
-from conftest import LiveServer, wav_file
+from conftest import HTTP_TIMEOUT, WAIT_S, LiveServer, wav_file
 
 
 def _built_in() -> set[str]:
@@ -222,9 +222,9 @@ def test_samples(live: LiveServer) -> None:
     assert httpx.get(live.url + "/api/v1/samples/nope.wav").status_code == 400
 
 
-def wait_job(live: LiveServer, job_id: str, timeout: float = 30.0) -> dict:
-    deadline = time.time() + timeout
-    while time.time() < deadline:
+def wait_job(live: LiveServer, job_id: str, timeout: float = WAIT_S) -> dict:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
         job = httpx.get(live.url + f"/api/v1/jobs/{job_id}").json()
         if job["state"] in ("done", "error"):
             return job
@@ -289,7 +289,7 @@ def test_events_stream(live: LiveServer) -> None:
     ready = threading.Event()
 
     def listen() -> None:
-        with httpx.stream("GET", live.url + "/api/v1/events", timeout=20) as response:
+        with httpx.stream("GET", live.url + "/api/v1/events", timeout=HTTP_TIMEOUT) as response:
             assert response.headers["content-type"].startswith("text/event-stream")
             for line in response.iter_lines():
                 if line.startswith("data: "):
@@ -301,12 +301,12 @@ def test_events_stream(live: LiveServer) -> None:
 
     thread = threading.Thread(target=listen, daemon=True)
     thread.start()
-    assert ready.wait(5)
+    assert ready.wait(WAIT_S)
     httpx.post(live.url + "/v1/audio/transcriptions", files={"file": wav_file(1.0)}, data={"model": "fake-stt"})
     job_id = httpx.post(
         live.url + "/api/v1/bench", json={"kind": "stt", "model": "fake-stt", "concurrency": [1], "duration_s": 0.3}
     ).json()["job_id"]
-    thread.join(timeout=15)
+    thread.join(timeout=WAIT_S)
     assert not thread.is_alive()
     first = events[0]
     assert first["type"] == "stats" and "uptime_s" in first and "models" in first  # same shape as /stats
