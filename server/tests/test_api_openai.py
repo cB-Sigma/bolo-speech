@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import io
+import threading
+from collections.abc import Iterator
 
 import httpx
 import numpy as np
@@ -11,7 +13,7 @@ import openai
 import pytest
 
 from bolo.audio import decode_audio, mulaw_decode
-from conftest import LiveServer, wav_bytes, wav_file
+from conftest import WAIT_S, LiveServer, wav_bytes, wav_file
 
 
 @pytest.fixture
@@ -126,28 +128,41 @@ def test_speech_formats(client: openai.OpenAI, fmt: str, media: str) -> None:
         assert len(samples) / rate == pytest.approx(0.72, rel=0.1)
 
 
-def test_speech_streams_audio_before_synthesis_finishes(client: openai.OpenAI, live: LiveServer) -> None:
-    import time
-
+def test_speech_streams_audio_before_synthesis_finishes(
+    client: openai.OpenAI, live: LiveServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The first sentence's audio reaches the client while the rest of the text is still to be synthesised. Shown
+    by the order of events, not by timing: every sentence after the first waits in the engine until the client has
+    audio, so a server that held the audio back until synthesis ended would leave them waiting (and fail)."""
     text = "One sentence here. " * 8
-    # load the voice and the text pipeline first: the first request's set-up (0.2 s here) is not what is measured
-    client.audio.speech.create(model="fake-tts", voice="alpha", input="Warm up.", response_format="pcm")
-    t0 = time.perf_counter()
-    first_at = None
+    client.audio.speech.create(model="fake-tts", voice="alpha", input="Warm up.", response_format="pcm")  # loads it
+    model = live.core.manager.loaded["fake-tts"].model
+    synthesize = model.synthesize
+    client_has_audio = threading.Event()
+    started: list[str] = []
+    waited: list[bool] = []  # for each sentence after the first: did the client have audio before it was made?
+
+    def gated(text: str, *args: object, **kwargs: object) -> Iterator[np.ndarray]:
+        started.append(text)
+        if len(started) > 1:
+            waited.append(client_has_audio.wait(WAIT_S))
+            client_has_audio.set()  # one wait is enough to fail the test; the rest need not wait again
+        yield from synthesize(text, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(model, "synthesize", gated)
     total = 0
     with client.audio.speech.with_streaming_response.create(
         model="fake-tts", voice="alpha", input=text, response_format="pcm"
     ) as response:
         for chunk in response.iter_bytes():
-            if first_at is None and chunk:
-                first_at = time.perf_counter() - t0
+            if chunk:
+                client_has_audio.set()
             total += len(chunk)
-    elapsed = time.perf_counter() - t0
-    assert first_at is not None and first_at < elapsed / 3  # the first audio arrives long before the last
+    assert len(started) == 8 and waited == [True] * 7
     assert total == pytest.approx(len(text.strip()) * 0.06 * 24000 * 2, rel=0.1)
     trace = httpx.get(live.url + "/api/v1/requests", params={"kind": "tts", "limit": 1}).json()["requests"][0]
     assert trace["status"] == "ok" and trace["transport"] == "http"
-    assert trace["ttfa_ms"] is not None and trace["ttfa_ms"] < trace["total_ms"] / 3
+    assert trace["ttfa_ms"] is not None and trace["ttfa_ms"] < trace["total_ms"]
     assert [p["name"] for p in trace["phases"]] == [
         "normalize",
         "queue",
