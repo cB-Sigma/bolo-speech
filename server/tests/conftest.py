@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import io
 import os
 import socket
@@ -11,6 +12,7 @@ import time
 from collections.abc import Iterator
 from pathlib import Path
 
+import httpx
 import numpy as np
 import pytest
 import uvicorn
@@ -32,6 +34,30 @@ def _quiet_handle_error(self: socketserver.BaseServer, request: object, client_a
 
 
 socketserver.BaseServer.handle_error = _quiet_handle_error  # type: ignore[method-assign]
+
+#: Time limits of the tests, in one place. What a test waits for (a server starting, an answer from it) takes well
+#: under a second on a quiet machine and many times that on a busy CI runner, so the limits are generous: they are
+#: reached only when something is wrong. BOLO_TEST_TIMEOUT_SCALE multiplies them (2 on a slow or shared machine).
+TIMEOUT_SCALE = float(os.environ.get("BOLO_TEST_TIMEOUT_SCALE") or 1) or 1.0
+#: how long a test waits for something to happen (a server to start, a thread to finish, an event)
+WAIT_S = 60.0 * TIMEOUT_SCALE
+#: a test's HTTP requests to the servers it starts; httpx's own default (5 s) is too short on a busy machine
+HTTP_TIMEOUT = httpx.Timeout(30.0 * TIMEOUT_SCALE)
+
+
+def _with_test_timeout(call: object) -> object:
+    @functools.wraps(call)  # type: ignore[arg-type]
+    def with_timeout(*args: object, **kwargs: object) -> object:
+        kwargs.setdefault("timeout", HTTP_TIMEOUT)
+        return call(*args, **kwargs)  # type: ignore[operator]
+
+    return with_timeout
+
+
+# httpx.get(...) and the like without a timeout, in the tests, get HTTP_TIMEOUT; an explicit one is kept. bolo's own
+# requests always say how long they wait, so this changes nothing in the code under test.
+for _name in ("request", "stream", "get", "options", "head", "post", "put", "patch", "delete"):
+    setattr(httpx, _name, _with_test_timeout(getattr(httpx, _name)))
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -168,21 +194,23 @@ class LiveServer:
 
     def start(self) -> None:
         self.thread.start()
-        deadline = time.time() + 10
+        deadline = time.monotonic() + WAIT_S
         while not self.server.started:
-            if time.time() > deadline:
-                raise RuntimeError("server did not start")
+            if not self.thread.is_alive():
+                raise RuntimeError("server did not start: it stopped during start-up")
+            if time.monotonic() > deadline:
+                raise RuntimeError(f"server did not start in {WAIT_S:.0f} s")
             time.sleep(0.02)
 
     def stop(self) -> None:
         self.server.should_exit = True
-        self.thread.join(timeout=10)
+        self.thread.join(timeout=WAIT_S)
 
     def call(self, coro: object) -> object:
         """Run a coroutine on the server's event loop (to inspect state safely)."""
         loop = self.core.events._loop
         assert loop is not None
-        return asyncio.run_coroutine_threadsafe(coro, loop).result(timeout=30)  # type: ignore[arg-type]
+        return asyncio.run_coroutine_threadsafe(coro, loop).result(timeout=WAIT_S)  # type: ignore[arg-type]
 
 
 @pytest.fixture

@@ -26,7 +26,7 @@ from bolo.config import Settings, load_settings
 from bolo.core import parse_fallbacks
 from bolo.providers import KIND_BY_NAME, KINDS, ProviderConfig, ProviderRegistry, redact_provider, scrub
 from bolo.remote.sarvam import guess_language, sarvam_language
-from conftest import LiveServer, speechlike, two_speakers, wav_bytes
+from conftest import HTTP_TIMEOUT, LiveServer, speechlike, two_speakers, wav_bytes
 from fake_providers import KEY, FakeLiveServer, FakeProviders
 from fake_realtime_server import FakeRealtimeServer
 from test_realtime import b64_pcm24
@@ -837,7 +837,7 @@ def test_fallback_from_cloud_to_local_and_back(settings: Settings, cloud: FakePr
 
 # -- the providers API --------------------------------------------------------------------------------------------
 def test_providers_api(settings: Settings, cloud: FakeProviders) -> None:
-    web = httpx.Client(timeout=60.0)  # the default 5 s is too short on a busy machine
+    web = httpx.Client(timeout=HTTP_TIMEOUT)  # httpx's default 5 s is too short on a busy machine
     settings.providers = {"sarvam": {"base_url": cloud.url, "api_key": KEY}}
     server = LiveServer(settings)
     server.start()
